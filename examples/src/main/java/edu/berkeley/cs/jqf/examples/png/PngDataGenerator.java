@@ -3,8 +3,10 @@ package edu.berkeley.cs.jqf.examples.png;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Random;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 
@@ -19,8 +21,16 @@ public class PngDataGenerator{
     private byte filterMethod;
     private byte interlace;
 
-    public PngDataGenerator(){
+    // image data values
+    private int width;
+    private int height;
+    private int channels;
 
+    // debugging
+    private boolean debugging;
+
+    public PngDataGenerator(boolean debugging){
+        this.debugging = debugging;
     }
 
     public byte[] generate(SourceOfRandomness randomness) {
@@ -31,7 +41,7 @@ public class PngDataGenerator{
 
             png.write(generateSignature());
             png.write(generateIHDR(randomness));
-            png.write(generateIDAT(generateImageData(randomness),randomness));
+            png.write(generateIDAT(randomness));
             png.write(generateIEND());
 
         }
@@ -56,8 +66,9 @@ public class PngDataGenerator{
             this.imageWidth = intToByteArray(randomness.nextInt(1, 100));
             this.imageHeight = intToByteArray(randomness.nextInt(1, 100));
 
-            //this.imageHeight = intToByteArray(1080);
-            //this.imageWidth = intToByteArray(1920);
+            // for debug purposes
+            //this.imageHeight = intToByteArray(2);
+            //this.imageWidth = intToByteArray(2);
 
             this.bitsPerChannel = (byte) 0x08;
             if(randomness.nextBoolean()) {
@@ -67,6 +78,7 @@ public class PngDataGenerator{
             }
             this.compressionMethod = (byte) 0x00;
             this.filterMethod = (byte) 0x00;
+            // filter method 0x01 implemented but doesn't work
             this.interlace = (byte) 0x00;
 
             ihdr.write(imageWidth);
@@ -86,15 +98,21 @@ public class PngDataGenerator{
 
     }
 
-    private byte[] generateIDAT(byte[] imageData, SourceOfRandomness randomness){
+    private byte[] generateIDAT(SourceOfRandomness randomness){
+
+        byte[] imageData = generateImageData(randomness);
+        byte[] filteredData = addFilter(imageData);
+
+        debugHex("image data", imageData);
+        debugHex("filtered data", filteredData);
 
         ByteArrayOutputStream idat = new ByteArrayOutputStream();
 
         Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION);
-        deflater.setInput(imageData);
+        deflater.setInput(filteredData);
         deflater.finish();
 
-        byte[] compressedData = new byte[imageData.length * 2];
+        byte[] compressedData = new byte[filteredData.length * 2];
         int compressedLength = deflater.deflate(compressedData);
         deflater.end();
 
@@ -105,7 +123,6 @@ public class PngDataGenerator{
 
     private byte[] generateImageData(SourceOfRandomness randomness){
 
-        int channels = 0;
         switch (colorType) {
             case 0x00 :
                 channels = 1;
@@ -118,19 +135,19 @@ public class PngDataGenerator{
                 break;
         }
 
-        int width = ByteBuffer.wrap(imageWidth).getInt();
-        int height = ByteBuffer.wrap(imageHeight).getInt();
-        int scanline = (width * channels + 1);
+        width = ByteBuffer.wrap(imageWidth).getInt();
+        height = ByteBuffer.wrap(imageHeight).getInt();
+        int scanline = width * channels;
 
         byte[] imageData = new byte[height * scanline];
 
         for (int y = 0; y < height; y++) {
 
-            imageData[y * scanline] = 0x00; //filter byte
+            //imageData[y * scanline] = 0x00; //filter byte
 
             for (int x = 0; x < width; x++) {
 
-                int index = y * scanline + 1 + x * channels;
+                int index = y * scanline + x * channels;
 
                 for (int i = 0; i < channels; i++) { // iterates through channels
 
@@ -143,7 +160,68 @@ public class PngDataGenerator{
             }
         }
 
+
         return imageData;
+
+    }
+
+    private byte[] addFilter(byte[] imageData){
+        switch (filterMethod) {
+            case 0:
+                return noFilter(imageData);
+            case 1:
+                return subFilter(imageData);
+            default:
+                return noFilter(imageData);
+        }
+    }
+
+    private byte[] noFilter(byte[] imageData){
+
+        ByteArrayOutputStream filteredData = new ByteArrayOutputStream();
+
+        int scanline = width * channels;
+
+        for (int y = 0; y < height; y++) {
+
+            filteredData.write(0x00);
+
+            for (int x = 0; x < scanline; x++) {
+
+                filteredData.write(imageData[y * scanline + x]);
+
+            }
+        }
+
+        return filteredData.toByteArray();
+    }
+
+    private byte[] subFilter(byte[] imageData) { // seems right, doesn't work
+
+        ByteArrayOutputStream filteredData = new ByteArrayOutputStream();
+
+        int scanline = width * channels;
+
+        for (int y = 0; y < height; y++) {
+
+            filteredData.write(0x01);
+
+            for (int x = 0; x < scanline; x++) {
+
+                int position = y * scanline + x;
+                if(x < channels) {
+                    filteredData.write(imageData[position]);
+                }
+                else {
+                    int sub = imageData[position] - imageData[position - channels];
+                    int mod = Integer.remainderUnsigned(sub, 256);
+                    filteredData.write(mod);
+                }
+
+            }
+        }
+
+        return filteredData.toByteArray();
 
     }
 
@@ -154,16 +232,17 @@ public class PngDataGenerator{
 
     }
 
-    /*public static String byteArrayToHex(byte[] a) {
+    public static String byteArrayToHex(byte[] a) {
         StringBuilder sb = new StringBuilder(a.length * 2);
         for(byte b: a)
             sb.append(String.format("%02X ", b));
         return sb.toString();
-    }*/
+    }
 
-    /*public static void debugHex(String name, byte[] bytes) {
-        System.out.println(name + ": " + byteArrayToHex(bytes));
-    }*/
+    public void debugHex(String name, byte[] bytes) {
+        if(debugging)
+            System.out.println(name + ": " + byteArrayToHex(bytes));
+    }
 
     private static byte[] intToByteArray(int value) {
         return ByteBuffer.allocate(4).putInt(value).array();
@@ -208,5 +287,27 @@ public class PngDataGenerator{
 
         return chunk.toByteArray();
 
+    }
+
+    public static void main(String[] args) {
+        PngDataGenerator gen = new PngDataGenerator(true);
+        SourceOfRandomness randomness = new SourceOfRandomness(new Random());
+        byte[] ihdr = gen.generateIHDR(randomness);
+        byte[] idat = gen.generateIDAT(randomness);
+        gen.debugHex("IHDR", ihdr);
+        gen.debugHex("IDAT", idat);
+
+        byte[] png = gen.generate(randomness);
+        gen.debugHex("Png", png);
+
+        try {
+
+            FileOutputStream fos = new FileOutputStream("Debugging_Png.png");
+            fos.write(png);
+            fos.close();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
