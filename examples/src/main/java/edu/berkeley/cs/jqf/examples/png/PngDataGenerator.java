@@ -66,27 +66,34 @@ public class PngDataGenerator{
             this.imageWidth = intToByteArray(randomness.nextInt(1, 100));
             this.imageHeight = intToByteArray(randomness.nextInt(1, 100));
 
-            // for debug purposes
-            //this.imageHeight = intToByteArray(2);
-            //this.imageWidth = intToByteArray(2);
-
             this.bitsPerChannel = (byte) 0x08;
             if(randomness.nextBoolean()) {
                 this.colorType = (byte) 0x00;
             } else {
                 this.colorType = (byte) 0x02;
             }
+
             this.compressionMethod = (byte) 0x00;
-            this.filterMethod = (byte) 0x00;
-            // filter method 0x01 implemented but doesn't work
+            this.filterMethod = (byte) randomness.nextInt(4);
             this.interlace = (byte) 0x00;
+
+
+            // for debug purposes
+            /*
+            this.imageHeight = intToByteArray(2);
+            this.imageWidth = intToByteArray(2);
+            this.filterMethod = 0x04;
+            this.colorType = 0x02;
+             */
+
 
             ihdr.write(imageWidth);
             ihdr.write(imageHeight);
             ihdr.write(bitsPerChannel);
             ihdr.write(colorType);
             ihdr.write(compressionMethod);
-            ihdr.write(filterMethod);
+            // filter methods are always 0 in the IHDR, the difference comes in the image data!
+            ihdr.write(0x00);
             ihdr.write(interlace);
 
         }
@@ -112,7 +119,7 @@ public class PngDataGenerator{
         deflater.setInput(filteredData);
         deflater.finish();
 
-        byte[] compressedData = new byte[filteredData.length * 2];
+        byte[] compressedData = new byte[filteredData.length * 2 + 10];
         int compressedLength = deflater.deflate(compressedData);
         deflater.end();
 
@@ -167,10 +174,14 @@ public class PngDataGenerator{
 
     private byte[] addFilter(byte[] imageData){
         switch (filterMethod) {
-            case 0:
-                return noFilter(imageData);
             case 1:
                 return subFilter(imageData);
+            case 2:
+                return upFilter(imageData);
+            case 3:
+                return averageFilter(imageData);
+            case 4:
+                return paethFilter(imageData);
             default:
                 return noFilter(imageData);
         }
@@ -224,6 +235,133 @@ public class PngDataGenerator{
         return filteredData.toByteArray();
 
     }
+
+    private byte[] upFilter(byte[] imageData) { // seems right, doesn't work
+
+        ByteArrayOutputStream filteredData = new ByteArrayOutputStream();
+
+        int scanline = width * channels;
+
+        for (int y = 0; y < height; y++) {
+
+            filteredData.write(0x02);
+
+            for (int x = 0; x < scanline; x++) {
+
+                int position = y * scanline + x;
+
+                if(y == 0) {
+                    filteredData.write(imageData[position]);
+                }
+                else {
+                    int sub = imageData[position] - imageData[position - scanline];
+                    int mod = Integer.remainderUnsigned(sub, 256);
+                    filteredData.write(mod);
+                }
+
+            }
+        }
+
+        return filteredData.toByteArray();
+
+    }
+
+    private byte[] averageFilter(byte[] imageData) { // seems right, doesn't work
+
+        ByteArrayOutputStream filteredData = new ByteArrayOutputStream();
+
+        int scanline = width * channels;
+
+        for (int y = 0; y < height; y++) {
+
+            filteredData.write(0x03);
+
+            for (int x = 0; x < scanline; x++) {
+
+                int position = y * scanline + x;
+
+                if(y == 0 || x < channels) {
+                    filteredData.write(imageData[position]);
+                }
+                else {
+                    int left = imageData[position - channels];
+                    int up = imageData[position - scanline];
+                    int subAverage = imageData[position] - (left + up)/2;
+                    int mod = Integer.remainderUnsigned(subAverage, 256);
+                    filteredData.write(mod);
+                }
+
+            }
+        }
+
+        return filteredData.toByteArray();
+
+    }
+
+    private byte[] paethFilter(byte[] imageData) { // seems right, doesn't work
+
+        ByteArrayOutputStream filteredData = new ByteArrayOutputStream();
+
+        int scanline = width * channels;
+
+        for (int y = 0; y < height; y++) {
+
+            filteredData.write(0x03);
+
+            for (int x = 0; x < scanline; x++) {
+
+                int position = y * scanline + x;
+
+                if(y == 0 || x < channels) {
+                    filteredData.write(imageData[position]);
+                }
+                else {
+                    int left = imageData[position - channels];
+                    int above = imageData[position - scanline];
+                    int upperLeft = imageData[position - scanline - channels];
+                    int subPaeth = imageData[position] - PaethPredictor(left, above, upperLeft);
+                    int mod = Integer.remainderUnsigned(subPaeth, 256);
+                    filteredData.write(mod);
+                }
+
+            }
+        }
+
+        return filteredData.toByteArray();
+
+    }
+
+    private int PaethPredictor(int left, int above, int upperLeft) {
+        int p = left + above - upperLeft;
+        int pLeft = Math.abs(p - left);
+        int pAbove = Math.abs(p - above);
+        int pUpperLeft = Math.abs(p - upperLeft);
+        if(pLeft <= pAbove && pLeft <= pUpperLeft) {
+            return left;
+        }
+        else if(pAbove <= pUpperLeft) {
+            return above;
+        }
+        return upperLeft;
+    }
+
+    /*
+    PSEUDO-CODE by libpng
+
+    function PaethPredictor (a, b, c)
+   begin
+        ; a = left, b = above, c = upper left
+        p := a + b - c        ; initial estimate
+        pa := abs(p - a)      ; distances to a, b, c
+        pb := abs(p - b)
+        pc := abs(p - c)
+        ; return nearest of a,b,c,
+        ; breaking ties in order a,b,c.
+        if pa <= pb AND pa <= pc then return a
+        else if pb <= pc then return b
+        else return c
+   end
+     */
 
     private byte[] generateIEND(){
 
