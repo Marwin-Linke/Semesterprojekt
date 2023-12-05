@@ -16,14 +16,14 @@ import java.io.*;
 public class PngTest {
 
     @Fuzz
-    public void testOpeningPNG(@From(PngGenerator.class) PngData pngData) {
+    public void testOpeningPng(@From(PngGenerator.class) PngData pngData) {
 
         readPng(pngData);
 
     }
 
     @Fuzz
-    public void testEditingPNG(@From(PngGenerator.class) PngData pngData) {
+    public void testEditingPng(@From(PngGenerator.class) PngData pngData) {
 
         PngData editedPng = changeColors(pngData); // reads png and changes color
 
@@ -31,7 +31,7 @@ public class PngTest {
 
         createPngFile(pngData, "Original_Png"); // creates local png file
 
-        createPngFile(editedPng, "Last_Converted_Png");
+        createPngFile(editedPng, "Edited_Png");
 
     }
 
@@ -69,6 +69,32 @@ public class PngTest {
 
         return editedPngData;
 
+    }
+
+    @Fuzz
+    public void testMirroringPng(@From(PngGenerator.class) PngData pngData) {
+        InputStream stream = new ByteArrayInputStream(pngData.data);
+        PngReader pngr = new PngReader(stream);
+        PngWriter pngw = new PngWriter(new File("Mirrored_Png.png"), pngr.imgInfo);
+        pngw.copyChunksFrom(pngr.getChunksList(), ChunkCopyBehaviour.COPY_ALL_SAFE);
+        for (int row = 0; row < pngr.imgInfo.rows; row++) {
+            ImageLineInt line = (ImageLineInt) pngr.readRow(row);
+            mirrorLineInt(pngr.imgInfo, line.getScanline());
+            pngw.writeRow(line, row);
+        }
+        pngr.end();
+        pngw.end();
+    }
+
+    private static void mirrorLineInt(ImageInfo imgInfo, int[] line) { // unpacked line
+        int channels = imgInfo.channels;
+        for (int c1 = 0, c2 = imgInfo.cols - 1; c1 < c2; c1++, c2--) { // swap pixels (not samples!)
+            for (int i = 0; i < channels; i++) {
+                int aux = line[c1 * channels + i];
+                line[c1 * channels + i] = line[c2 * channels + i];
+                line[c2 * channels + i] = aux;
+            }
+        }
     }
 
     private void readPng (PngData pngData) {
