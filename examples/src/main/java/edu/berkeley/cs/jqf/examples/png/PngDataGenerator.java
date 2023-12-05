@@ -18,13 +18,13 @@ public class PngDataGenerator{
     private byte bitsPerChannel;
     private byte colorType;
     private byte compressionMethod;
-    private byte filterMethod;
     private byte interlace;
 
     // image data values
     private int width;
     private int height;
     private int channels;
+    private int scanline;
 
     // debugging
     private boolean debugging;
@@ -63,6 +63,8 @@ public class PngDataGenerator{
 
         try {
 
+            // initializes and randomizes IHDR options
+
             this.imageWidth = intToByteArray(randomness.nextInt(1, 100));
             this.imageHeight = intToByteArray(randomness.nextInt(1, 100));
 
@@ -72,20 +74,35 @@ public class PngDataGenerator{
             } else {
                 this.colorType = (byte) 0x02;
             }
-
             this.compressionMethod = (byte) 0x00;
-            this.filterMethod = (byte) randomness.nextInt(4);
             this.interlace = (byte) 0x00;
 
 
             // for debug purposes
             /*
-            this.imageHeight = intToByteArray(2);
-            this.imageWidth = intToByteArray(2);
-            this.filterMethod = 0x04;
+            this.imageHeight = intToByteArray(5);
+            this.imageWidth = intToByteArray(1);
             this.colorType = 0x02;
-             */
+            */
 
+            // initializes image layout parameters, based on the specified options
+
+            switch (colorType) {
+                case 0x00 :
+                    channels = 1;
+                    break;
+                case 0x02 :
+                    channels = 3;
+                    break;
+                default:
+                    channels = 1;
+                    break;
+            }
+
+            width = ByteBuffer.wrap(imageWidth).getInt();
+            height = ByteBuffer.wrap(imageHeight).getInt();
+
+            // writes options into the IHDR chunk
 
             ihdr.write(imageWidth);
             ihdr.write(imageHeight);
@@ -105,12 +122,10 @@ public class PngDataGenerator{
 
     }
 
-    private byte[] generateIDAT(SourceOfRandomness randomness){
+    private byte[] generateIDAT(SourceOfRandomness randomness) {
 
-        byte[] imageData = generateImageData(randomness);
-        byte[] filteredData = addFilter(imageData);
+        byte[] filteredData = generateFilteredData(randomness);
 
-        debugHex("image data", imageData);
         debugHex("filtered data", filteredData);
 
         ByteArrayOutputStream idat = new ByteArrayOutputStream();
@@ -128,210 +143,144 @@ public class PngDataGenerator{
         return constructChunk("IDAT".getBytes(), idat);
     }
 
-    private byte[] generateImageData(SourceOfRandomness randomness){
+    private byte[] generateFilteredData(SourceOfRandomness randomness){
 
-        switch (colorType) {
-            case 0x00 :
-                channels = 1;
-                break;
-            case 0x02 :
-                channels = 3;
-                break;
-            default:
-                channels = 1;
-                break;
-        }
+        // length of the scanline, the horizontal line of the image + the filter byte
+        scanline = width * channels + 1;
 
-        width = ByteBuffer.wrap(imageWidth).getInt();
-        height = ByteBuffer.wrap(imageHeight).getInt();
-        int scanline = width * channels;
-
-        byte[] imageData = new byte[height * scanline];
+        byte[] imageData = new byte[height * scanline];;
 
         for (int y = 0; y < height; y++) {
 
-            //imageData[y * scanline] = 0x00; //filter byte
+            // each line can opt for a different filter method
+            int filterMethod = (byte) randomness.nextInt(5);
+
+            // the first byte of each scanline defines the filter method
+            imageData[y * scanline] = (byte) filterMethod;
 
             for (int x = 0; x < width; x++) {
 
-                int index = y * scanline + x * channels;
+                // the index is the first byte of each pixel
+                int index = y * scanline + 1 + x * channels;
 
                 for (int i = 0; i < channels; i++) { // iterates through channels
 
-                    // randomizes each channel
+                    // the position of each byte in the image data
+                    int position = index + i;
+
+                    // each channel inside the pixel is randomized
                     byte channel = (byte) (randomness.nextInt((int) Math.pow(2, 8)));
-                    imageData[index + i] = channel;
+                    imageData[position] = channel;
+
+                    // the filter is added onto each channel based on the filter method
+                    byte filteredChannel = addFilter(filterMethod, imageData, position);
+                    imageData[position] = filteredChannel;
 
                 }
-
             }
         }
-
 
         return imageData;
 
     }
 
-    private byte[] addFilter(byte[] imageData){
+
+    private byte addFilter(int filterMethod, byte[] imageData, int position){
         switch (filterMethod) {
             case 1:
-                return subFilter(imageData);
+                return subFilter(imageData, position);
             case 2:
-                return upFilter(imageData);
+                return upFilter(imageData, position);
             case 3:
-                return averageFilter(imageData);
+                return averageFilter(imageData, position);
             case 4:
-                return paethFilter(imageData);
+                return paethFilter(imageData, position);
             default:
-                return noFilter(imageData);
+                return imageData[position];
         }
     }
 
-    private byte[] noFilter(byte[] imageData){
+    private byte subFilter(byte[] imageData, int position) {
 
-        ByteArrayOutputStream filteredData = new ByteArrayOutputStream();
+        byte filteredChannel;
 
-        int scanline = width * channels;
-
-        for (int y = 0; y < height; y++) {
-
-            filteredData.write(0x00);
-
-            for (int x = 0; x < scanline; x++) {
-
-                filteredData.write(imageData[y * scanline + x]);
-
-            }
+        // first pixel of each scanline is ignored
+        if(position % scanline < channels) {
+            filteredChannel = imageData[position];
+        }
+        else {
+            int sub = imageData[position] - imageData[position - channels];
+            int mod = Integer.remainderUnsigned(sub, 256);
+            filteredChannel = (byte) mod;
         }
 
-        return filteredData.toByteArray();
-    }
-
-    private byte[] subFilter(byte[] imageData) { // seems right, doesn't work
-
-        ByteArrayOutputStream filteredData = new ByteArrayOutputStream();
-
-        int scanline = width * channels;
-
-        for (int y = 0; y < height; y++) {
-
-            filteredData.write(0x01);
-
-            for (int x = 0; x < scanline; x++) {
-
-                int position = y * scanline + x;
-                if(x < channels) {
-                    filteredData.write(imageData[position]);
-                }
-                else {
-                    int sub = imageData[position] - imageData[position - channels];
-                    int mod = Integer.remainderUnsigned(sub, 256);
-                    filteredData.write(mod);
-                }
-
-            }
-        }
-
-        return filteredData.toByteArray();
+        return filteredChannel;
 
     }
 
-    private byte[] upFilter(byte[] imageData) { // seems right, doesn't work
+    private byte upFilter(byte[] imageData, int position) {
 
-        ByteArrayOutputStream filteredData = new ByteArrayOutputStream();
+        byte filteredChannel;
 
-        int scanline = width * channels;
-
-        for (int y = 0; y < height; y++) {
-
-            filteredData.write(0x02);
-
-            for (int x = 0; x < scanline; x++) {
-
-                int position = y * scanline + x;
-
-                if(y == 0) {
-                    filteredData.write(imageData[position]);
-                }
-                else {
-                    int sub = imageData[position] - imageData[position - scanline];
-                    int mod = Integer.remainderUnsigned(sub, 256);
-                    filteredData.write(mod);
-                }
-
-            }
+        // first scanline is ignored
+        if(position < scanline) {
+            filteredChannel =  imageData[position];
+        }
+        else {
+            int sub = imageData[position] - imageData[position - scanline];
+            int mod = Integer.remainderUnsigned(sub, 256);
+            filteredChannel = (byte) mod;
         }
 
-        return filteredData.toByteArray();
+        return filteredChannel;
 
     }
 
-    private byte[] averageFilter(byte[] imageData) { // seems right, doesn't work
+    private byte averageFilter(byte[] imageData, int position) {
 
-        ByteArrayOutputStream filteredData = new ByteArrayOutputStream();
+        byte filteredChannel;
 
-        int scanline = width * channels;
-
-        for (int y = 0; y < height; y++) {
-
-            filteredData.write(0x03);
-
-            for (int x = 0; x < scanline; x++) {
-
-                int position = y * scanline + x;
-
-                if(y == 0 || x < channels) {
-                    filteredData.write(imageData[position]);
-                }
-                else {
-                    int left = imageData[position - channels];
-                    int up = imageData[position - scanline];
-                    int subAverage = imageData[position] - (left + up)/2;
-                    int mod = Integer.remainderUnsigned(subAverage, 256);
-                    filteredData.write(mod);
-                }
-
-            }
+        // first pixel of each scanline and the first scanline itself are ignored
+        if(position < scanline || position % scanline < channels) {
+            filteredChannel = imageData[position];
+        }
+        else {
+            int left = imageData[position - channels];
+            int up = imageData[position - scanline];
+            int subAverage = imageData[position] - (left + up) / 2;
+            int mod = Integer.remainderUnsigned(subAverage, 256);
+            filteredChannel = (byte) mod;
         }
 
-        return filteredData.toByteArray();
+        return filteredChannel;
 
     }
 
-    private byte[] paethFilter(byte[] imageData) { // seems right, doesn't work
+    private byte paethFilter(byte[] imageData, int position) {
 
-        ByteArrayOutputStream filteredData = new ByteArrayOutputStream();
+        byte filteredChannel;
 
-        int scanline = width * channels;
-
-        for (int y = 0; y < height; y++) {
-
-            filteredData.write(0x03);
-
-            for (int x = 0; x < scanline; x++) {
-
-                int position = y * scanline + x;
-
-                if(y == 0 || x < channels) {
-                    filteredData.write(imageData[position]);
-                }
-                else {
-                    int left = imageData[position - channels];
-                    int above = imageData[position - scanline];
-                    int upperLeft = imageData[position - scanline - channels];
-                    int subPaeth = imageData[position] - PaethPredictor(left, above, upperLeft);
-                    int mod = Integer.remainderUnsigned(subPaeth, 256);
-                    filteredData.write(mod);
-                }
-
-            }
+        // first pixel of each scanline and the first scanline itself are ignored
+        if(position < scanline || position % scanline < channels) {
+            filteredChannel = imageData[position];
+        }
+        else {
+            int left = imageData[position - channels];
+            int above = imageData[position - scanline];
+            int upperLeft = imageData[position - scanline - channels];
+            int subPaeth = imageData[position] - PaethPredictor(left, above, upperLeft);
+            int mod = Integer.remainderUnsigned(subPaeth, 256);
+            filteredChannel = (byte) mod;
         }
 
-        return filteredData.toByteArray();
+        return filteredChannel;
 
     }
 
     private int PaethPredictor(int left, int above, int upperLeft) {
+
+        // paeth predictor is an algorithm used for the paeth filter
+
         int p = left + above - upperLeft;
         int pLeft = Math.abs(p - left);
         int pAbove = Math.abs(p - above);
@@ -349,18 +298,18 @@ public class PngDataGenerator{
     PSEUDO-CODE by libpng
 
     function PaethPredictor (a, b, c)
-   begin
-        ; a = left, b = above, c = upper left
-        p := a + b - c        ; initial estimate
-        pa := abs(p - a)      ; distances to a, b, c
-        pb := abs(p - b)
-        pc := abs(p - c)
-        ; return nearest of a,b,c,
-        ; breaking ties in order a,b,c.
-        if pa <= pb AND pa <= pc then return a
-        else if pb <= pc then return b
-        else return c
-   end
+       begin
+            ; a = left, b = above, c = upper left
+            p := a + b - c        ; initial estimate
+            pa := abs(p - a)      ; distances to a, b, c
+            pb := abs(p - b)
+            pc := abs(p - c)
+            ; return nearest of a,b,c,
+            ; breaking ties in order a,b,c.
+            if pa <= pb AND pa <= pc then return a
+            else if pb <= pc then return b
+            else return c
+       end
      */
 
     private byte[] generateIEND(){
