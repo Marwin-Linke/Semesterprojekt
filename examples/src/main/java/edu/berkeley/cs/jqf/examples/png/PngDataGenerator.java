@@ -17,7 +17,6 @@ public class PngDataGenerator{
     private byte[] imageHeight = new byte[4];
     private byte bitsPerChannel;
     private byte colorType;
-    private byte compressionMethod;
     private byte interlace;
 
     // image data values
@@ -68,13 +67,29 @@ public class PngDataGenerator{
             this.imageWidth = intToByteArray(randomness.nextInt(1, 100));
             this.imageHeight = intToByteArray(randomness.nextInt(1, 100));
 
-            this.bitsPerChannel = (byte) 0x08;
-            if(randomness.nextBoolean()) {
-                this.colorType = (byte) 0x00;
-            } else {
-                this.colorType = (byte) 0x02;
+            this.bitsPerChannel = (byte) (randomness.nextInt(1, 2) * 8);
+
+            // notice: channels is here defined as the channels combined with the bit depth,
+            // this is not a good implementation and should be reworked later
+            switch (randomness.nextInt(4)) {
+                case 0: // grayscale
+                    this.colorType = 0x00;
+                    this.channels = bitsPerChannel / 8;
+                    break;
+                case 1: // true color
+                    this.colorType = 0x02;
+                    this.channels = 3 * (bitsPerChannel / 8);
+                    break;
+                case 2: // grayscale with alpha
+                    this.colorType = 0x04;
+                    this.channels = 2 * (bitsPerChannel / 8);
+                    break;
+                case 3: // true color with alpha
+                    this.colorType = 0x06;
+                    this.channels = 4 * (bitsPerChannel / 8);
+                    break;
+
             }
-            this.compressionMethod = (byte) 0x00;
             this.interlace = (byte) 0x00;
 
 
@@ -87,20 +102,8 @@ public class PngDataGenerator{
 
             // initializes image layout parameters, based on the specified options
 
-            switch (colorType) {
-                case 0x00 :
-                    channels = 1;
-                    break;
-                case 0x02 :
-                    channels = 3;
-                    break;
-                default:
-                    channels = 1;
-                    break;
-            }
-
-            width = ByteBuffer.wrap(imageWidth).getInt();
-            height = ByteBuffer.wrap(imageHeight).getInt();
+            this.width = ByteBuffer.wrap(imageWidth).getInt();
+            this.height = ByteBuffer.wrap(imageHeight).getInt();
 
             // writes options into the IHDR chunk
 
@@ -108,7 +111,8 @@ public class PngDataGenerator{
             ihdr.write(imageHeight);
             ihdr.write(bitsPerChannel);
             ihdr.write(colorType);
-            ihdr.write(compressionMethod);
+            // compression method is fixed at 0x00
+            ihdr.write(0x00);
             // filter methods are always 0 in the IHDR, the difference comes in the image data!
             ihdr.write(0x00);
             ihdr.write(interlace);
@@ -118,7 +122,11 @@ public class PngDataGenerator{
             e.printStackTrace();
         }
 
-        return constructChunk("IHDR".getBytes(), ihdr);
+        byte[] ihdrBytes = constructChunk("IHDR".getBytes(), ihdr);
+
+        debugHex("IHDR", ihdrBytes);
+
+        return ihdrBytes;
 
     }
 
@@ -140,7 +148,11 @@ public class PngDataGenerator{
 
         idat.write(compressedData, 0, compressedLength);
 
-        return constructChunk("IDAT".getBytes(), idat);
+        byte[] idatBytes = constructChunk("IDAT".getBytes(), idat);
+
+        debugHex("IDAT", idatBytes);
+
+        return idatBytes;
     }
 
     private byte[] generateFilteredData(SourceOfRandomness randomness){
@@ -379,10 +391,6 @@ public class PngDataGenerator{
     public static void main(String[] args) {
         PngDataGenerator gen = new PngDataGenerator(true);
         SourceOfRandomness randomness = new SourceOfRandomness(new Random());
-        byte[] ihdr = gen.generateIHDR(randomness);
-        byte[] idat = gen.generateIDAT(randomness);
-        gen.debugHex("IHDR", ihdr);
-        gen.debugHex("IDAT", idat);
 
         byte[] png = gen.generate(randomness);
         gen.debugHex("Png", png);
