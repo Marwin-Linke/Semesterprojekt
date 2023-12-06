@@ -73,9 +73,12 @@ public class PngTest {
 
     @Fuzz
     public void testMirroringPng(@From(PngGenerator.class) PngData pngData) {
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
         InputStream stream = new ByteArrayInputStream(pngData.data);
         PngReader pngr = new PngReader(stream);
-        PngWriter pngw = new PngWriter(new File("Mirrored_Png.png"), pngr.imgInfo);
+        PngWriter pngw = new PngWriter(outputStream, pngr.imgInfo);
         pngw.copyChunksFrom(pngr.getChunksList(), ChunkCopyBehaviour.COPY_ALL_SAFE);
         for (int row = 0; row < pngr.imgInfo.rows; row++) {
             ImageLineInt line = (ImageLineInt) pngr.readRow(row);
@@ -84,6 +87,11 @@ public class PngTest {
         }
         pngr.end();
         pngw.end();
+
+        createPngFile(pngData, "Original_Png");
+
+        createPngFile(new PngData(outputStream.toByteArray()), "Mirrored_Png");
+
     }
 
     private static void mirrorLineInt(ImageInfo imgInfo, int[] line) { // unpacked line
