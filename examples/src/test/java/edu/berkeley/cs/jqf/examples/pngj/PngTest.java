@@ -67,6 +67,8 @@ public class PngTest {
 
         PngData editedPngData = new PngData(outputStream.toByteArray());
 
+        //testMirroringPng(editedPngData);
+
         return editedPngData;
 
     }

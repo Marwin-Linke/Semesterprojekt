@@ -24,6 +24,7 @@ public class PngDataGenerator{
     private int height;
     private int channels;
     private int scanline;
+    private boolean paletteUsed;
 
     // debugging
     private boolean debugging;
@@ -40,6 +41,9 @@ public class PngDataGenerator{
 
             png.write(generateSignature());
             png.write(generateIHDR(randomness));
+            if(paletteUsed) {
+                png.write(generatePLTE(randomness));
+            }
             png.write(generateIDAT(randomness));
             png.write(generateIEND());
 
@@ -69,9 +73,19 @@ public class PngDataGenerator{
 
             this.bitsPerChannel = (byte) (randomness.nextInt(1, 2) * 8);
 
+            int colorMethod = randomness.nextInt(5);
+
+            // for debug purposes
+            /*
+            this.imageHeight = intToByteArray(1);
+            this.imageWidth = intToByteArray(1);
+            this.bitsPerChannel = 0x08;
+            colorMethod = 0;
+            */
+
             // notice: channels is here defined as the channels combined with the bit depth,
             // this is not a good implementation and should be reworked later
-            switch (randomness.nextInt(4)) {
+            switch (colorMethod) {
                 case 0: // grayscale
                     this.colorType = 0x00;
                     this.channels = bitsPerChannel / 8;
@@ -88,17 +102,14 @@ public class PngDataGenerator{
                     this.colorType = 0x06;
                     this.channels = 4 * (bitsPerChannel / 8);
                     break;
+                case 4: // indexed color, palette used
+                    this.colorType = 0x03;
+                    this.channels = (bitsPerChannel / 8);
+                    this.paletteUsed = true;
+                    break;
 
             }
             this.interlace = (byte) 0x00;
-
-
-            // for debug purposes
-            /*
-            this.imageHeight = intToByteArray(5);
-            this.imageWidth = intToByteArray(1);
-            this.colorType = 0x02;
-            */
 
             // initializes image layout parameters, based on the specified options
 
@@ -127,6 +138,21 @@ public class PngDataGenerator{
         debugHex("IHDR", ihdrBytes);
 
         return ihdrBytes;
+
+    }
+
+    private byte[] generatePLTE(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream plte = new ByteArrayOutputStream();
+
+        for(int i = 0; i < 256; i++) {
+
+            plte.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // red
+            plte.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // green
+            plte.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // blue
+        }
+
+        return constructChunk("PLTE".getBytes(), plte);
 
     }
 
@@ -167,6 +193,7 @@ public class PngDataGenerator{
             // each line can opt for a different filter method
             int filterMethod = (byte) randomness.nextInt(5);
 
+            //filterMethod = 0;
             // the first byte of each scanline defines the filter method
             imageData[y * scanline] = (byte) filterMethod;
 
