@@ -123,17 +123,17 @@ public class PngDataGenerator{
                 this.channels = 1;
                 break;
             case 1: // grayscale with alpha
-                this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,5)));
+                this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,4)));
                 this.colorType = 0x04;
                 this.channels = 2;
                 break;
             case 2: // true color
-                this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,5)));
+                this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,4)));
                 this.colorType = 0x02;
                 this.channels = 3;
                 break;
             case 3: // true color with alpha
-                this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,5)));
+                this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,4)));
                 this.colorType = 0x06;
                 this.channels = 4;
                 break;
@@ -177,11 +177,13 @@ public class PngDataGenerator{
 
         ByteArrayOutputStream idat = new ByteArrayOutputStream();
 
-        Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION);
+        int compressionMethod = randomness.nextInt(-1,9);
+
+        Deflater deflater = new Deflater(compressionMethod);
         deflater.setInput(filteredData);
         deflater.finish();
 
-        byte[] compressedData = new byte[filteredData.length * 2 + 10];
+        byte[] compressedData = new byte[filteredData.length * 100 + 10];
         int compressedLength = deflater.deflate(compressedData);
         deflater.end();
 
