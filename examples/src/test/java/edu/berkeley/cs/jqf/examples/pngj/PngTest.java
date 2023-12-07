@@ -18,6 +18,7 @@ public class PngTest {
     @Fuzz
     public void testOpeningPng(@From(PngGenerator.class) PngData pngData) {
 
+        createPngFile(pngData, "Original_Png");
         readPng(pngData);
 
     }
@@ -45,9 +46,8 @@ public class PngTest {
 
         int channels = pngr.imgInfo.channels;
         Assume.assumeTrue(channels >= 3);
+        Assume.assumeTrue(pngr.imgInfo.bitDepth == 8);
 
-        if (channels < 3 || pngr.imgInfo.bitDepth != 8)
-            throw new RuntimeException("This method is for RGB8/RGBA8 images");
         //File editedPng = new File("Edited_Png.png");
         PngWriter pngw = new PngWriter(outputStream, pngr.imgInfo);
         pngw.copyChunksFrom(pngr.getChunksList(), ChunkCopyBehaviour.COPY_ALL_SAFE);

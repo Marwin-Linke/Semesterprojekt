@@ -71,45 +71,14 @@ public class PngDataGenerator{
             this.imageWidth = intToByteArray(randomness.nextInt(1, 100));
             this.imageHeight = intToByteArray(randomness.nextInt(1, 100));
 
-            this.bitsPerChannel = (byte) (randomness.nextInt(1, 2) * 8);
+            this.interlace = (byte) 0x00;
 
-            int colorMethod = randomness.nextInt(5);
+            initializeRandomColoring(randomness);
 
             // for debug purposes
-            /*
-            this.imageHeight = intToByteArray(1);
-            this.imageWidth = intToByteArray(1);
-            this.bitsPerChannel = 0x08;
-            colorMethod = 0;
-            */
-
-            // notice: channels is here defined as the channels combined with the bit depth,
-            // this is not a good implementation and should be reworked later
-            switch (colorMethod) {
-                case 0: // grayscale
-                    this.colorType = 0x00;
-                    this.channels = bitsPerChannel / 8;
-                    break;
-                case 1: // true color
-                    this.colorType = 0x02;
-                    this.channels = 3 * (bitsPerChannel / 8);
-                    break;
-                case 2: // grayscale with alpha
-                    this.colorType = 0x04;
-                    this.channels = 2 * (bitsPerChannel / 8);
-                    break;
-                case 3: // true color with alpha
-                    this.colorType = 0x06;
-                    this.channels = 4 * (bitsPerChannel / 8);
-                    break;
-                case 4: // indexed color, palette used
-                    this.colorType = 0x03;
-                    this.channels = (bitsPerChannel / 8);
-                    this.paletteUsed = true;
-                    break;
-
-            }
-            this.interlace = (byte) 0x00;
+            //this.imageHeight = intToByteArray(32);
+            //this.imageWidth = intToByteArray(32);
+            //initializeRandomColoring(randomness, 4, 1);
 
             // initializes image layout parameters, based on the specified options
 
@@ -139,6 +108,50 @@ public class PngDataGenerator{
 
         return ihdrBytes;
 
+    }
+
+    private void initializeRandomColoring(SourceOfRandomness randomness, int colorMethod, int bitDepth) {
+
+        if (colorMethod == -1)
+            colorMethod = randomness.nextInt(5);
+
+
+        switch (colorMethod) {
+            case 0: // grayscale
+                this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(5)));
+                this.colorType = 0x00;
+                this.channels = 1;
+                break;
+            case 1: // grayscale with alpha
+                this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,5)));
+                this.colorType = 0x04;
+                this.channels = 2;
+                break;
+            case 2: // true color
+                this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,5)));
+                this.colorType = 0x02;
+                this.channels = 3;
+                break;
+            case 3: // true color with alpha
+                this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,5)));
+                this.colorType = 0x06;
+                this.channels = 4;
+                break;
+            case 4: // indexed color, palette used
+                this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(4)));
+                this.colorType = 0x03;
+                this.channels = 1;
+                this.paletteUsed = true;
+                break;
+
+        }
+
+        if (bitDepth != -1)
+            this.bitsPerChannel = (byte) bitDepth;
+    }
+
+    private void initializeRandomColoring (SourceOfRandomness randomness) {
+        initializeRandomColoring(randomness, -1, -1);
     }
 
     private byte[] generatePLTE(SourceOfRandomness randomness) {
@@ -183,10 +196,11 @@ public class PngDataGenerator{
 
     private byte[] generateFilteredData(SourceOfRandomness randomness){
 
-        // length of the scanline, the horizontal line of the image + the filter byte
-        scanline = width * channels + 1;
+        // the scanline indicates the length of one horizontal line in the image (filter byte included)
 
-        byte[] imageData = new byte[height * scanline];;
+        float channelSize = (float) bitsPerChannel / 8;
+        scanline = (int) Math.ceil(width * channels * channelSize) + 1;
+        byte[] imageData = new byte[height * scanline];
 
         for (int y = 0; y < height; y++) {
 
@@ -197,25 +211,19 @@ public class PngDataGenerator{
             // the first byte of each scanline defines the filter method
             imageData[y * scanline] = (byte) filterMethod;
 
-            for (int x = 0; x < width; x++) {
+            for (int x = 1; x < scanline; x++) {
 
-                // the index is the first byte of each pixel
-                int index = y * scanline + 1 + x * channels;
+                // the position of each byte in the image data
+                int position = y * scanline + x;
 
-                for (int i = 0; i < channels; i++) { // iterates through channels
+                // each byte is randomized, based on the channelSize (bit-depth)
+                // ... multiple channels or pixel can be in one byte
+                byte imageByte = (byte) (randomness.nextInt((int) Math.pow(2, 8)));
+                imageData[position] = imageByte;
 
-                    // the position of each byte in the image data
-                    int position = index + i;
-
-                    // each channel inside the pixel is randomized
-                    byte channel = (byte) (randomness.nextInt((int) Math.pow(2, 8)));
-                    imageData[position] = channel;
-
-                    // the filter is added onto each channel based on the filter method
-                    byte filteredChannel = addFilter(filterMethod, imageData, position);
-                    imageData[position] = filteredChannel;
-
-                }
+                // the filter is added onto each byte based on the filter method
+                byte filteredImageByte = addFilter(filterMethod, imageData, position);
+                imageData[position] = filteredImageByte;
             }
         }
 
@@ -241,67 +249,67 @@ public class PngDataGenerator{
 
     private byte subFilter(byte[] imageData, int position) {
 
-        byte filteredChannel;
+        byte filteredImageByte;
 
         // first pixel of each scanline is ignored
         if(position % scanline < channels) {
-            filteredChannel = imageData[position];
+            filteredImageByte = imageData[position];
         }
         else {
             int sub = imageData[position] - imageData[position - channels];
             int mod = Integer.remainderUnsigned(sub, 256);
-            filteredChannel = (byte) mod;
+            filteredImageByte = (byte) mod;
         }
 
-        return filteredChannel;
+        return filteredImageByte;
 
     }
 
     private byte upFilter(byte[] imageData, int position) {
 
-        byte filteredChannel;
+        byte filteredImageByte;
 
         // first scanline is ignored
         if(position < scanline) {
-            filteredChannel =  imageData[position];
+            filteredImageByte =  imageData[position];
         }
         else {
             int sub = imageData[position] - imageData[position - scanline];
             int mod = Integer.remainderUnsigned(sub, 256);
-            filteredChannel = (byte) mod;
+            filteredImageByte = (byte) mod;
         }
 
-        return filteredChannel;
+        return filteredImageByte;
 
     }
 
     private byte averageFilter(byte[] imageData, int position) {
 
-        byte filteredChannel;
+        byte filteredImageByte;
 
         // first pixel of each scanline and the first scanline itself are ignored
         if(position < scanline || position % scanline < channels) {
-            filteredChannel = imageData[position];
+            filteredImageByte = imageData[position];
         }
         else {
             int left = imageData[position - channels];
             int up = imageData[position - scanline];
             int subAverage = imageData[position] - (left + up) / 2;
             int mod = Integer.remainderUnsigned(subAverage, 256);
-            filteredChannel = (byte) mod;
+            filteredImageByte = (byte) mod;
         }
 
-        return filteredChannel;
+        return filteredImageByte;
 
     }
 
     private byte paethFilter(byte[] imageData, int position) {
 
-        byte filteredChannel;
+        byte filteredImageByte;
 
         // first pixel of each scanline and the first scanline itself are ignored
         if(position < scanline || position % scanline < channels) {
-            filteredChannel = imageData[position];
+            filteredImageByte = imageData[position];
         }
         else {
             int left = imageData[position - channels];
@@ -309,10 +317,10 @@ public class PngDataGenerator{
             int upperLeft = imageData[position - scanline - channels];
             int subPaeth = imageData[position] - PaethPredictor(left, above, upperLeft);
             int mod = Integer.remainderUnsigned(subPaeth, 256);
-            filteredChannel = (byte) mod;
+            filteredImageByte = (byte) mod;
         }
 
-        return filteredChannel;
+        return filteredImageByte;
 
     }
 
