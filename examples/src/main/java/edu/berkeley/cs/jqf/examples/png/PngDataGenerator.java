@@ -24,7 +24,11 @@ public class PngDataGenerator{
     private int height;
     private int channels;
     private int scanline;
+
+    // chunks
     private boolean paletteUsed;
+    private boolean transparencyUsed;
+    private int transparencyMethod;
 
     // debugging
     private boolean debugging;
@@ -45,6 +49,9 @@ public class PngDataGenerator{
             png.write(generateIHDR(randomness));
             if(paletteUsed) {
                 png.write(generatePLTE(randomness));
+            }
+            if(transparencyUsed) {
+                png.write(generateTRNS(randomness));
             }
             png.write(generateIDAT(randomness));
             png.write(generateIEND());
@@ -75,7 +82,9 @@ public class PngDataGenerator{
         /*
         this.imageHeight = intToByteArray(2);
         this.imageWidth = intToByteArray(2);
-        initializeRandomColoring(randomness, 2, 8);
+        initializeRandomColoring(randomness, 4, 4);
+        transparencyUsed = true;
+        transparencyMethod = 0;
         */
         // END OF DEBUGGING AREA
 
@@ -95,6 +104,10 @@ public class PngDataGenerator{
                 this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(5)));
                 this.colorType = 0x00;
                 this.channels = 1;
+                if(randomness.nextBoolean()) {
+                    transparencyUsed = true;
+                    transparencyMethod = 1;
+                }
                 break;
             case 1: // grayscale with alpha
                 this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,4)));
@@ -107,6 +120,10 @@ public class PngDataGenerator{
                 this.channels = 3;
                 if(randomness.nextBoolean())
                     paletteUsed = true;
+                if(randomness.nextBoolean()) {
+                    transparencyUsed = true;
+                    transparencyMethod = 2;
+                }
                 break;
             case 3: // true color with alpha
                 this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,4)));
@@ -120,6 +137,10 @@ public class PngDataGenerator{
                 this.colorType = 0x03;
                 this.channels = 1;
                 this.paletteUsed = true;
+                if(randomness.nextBoolean()) {
+                    transparencyUsed = true;
+                    transparencyMethod = 0;
+                }
                 break;
 
         }
@@ -174,6 +195,31 @@ public class PngDataGenerator{
         }
 
         return constructChunk("PLTE".getBytes(), plte);
+
+    }
+
+    private byte[] generateTRNS(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream tRNS = new ByteArrayOutputStream();
+
+        int bytes = 0;
+        switch(transparencyMethod) {
+            case 0: // for indexed colors, artificial alpha palette
+                bytes = 256;
+                break;
+            case 1: // for grayscale, single alpha value for specified bytes
+                bytes = 2;
+                break;
+            case 2: // for true color, single alpha value for specified bytes
+                bytes = 6;
+                break;
+        }
+
+        for(int i = 0; i < bytes; i++) {
+            tRNS.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // alpha
+        }
+
+        return constructChunk("tRNS".getBytes(), tRNS);
 
     }
 
@@ -434,20 +480,24 @@ public class PngDataGenerator{
     }
 
     public static void main(String[] args) {
-        PngDataGenerator gen = new PngDataGenerator(true);
-        SourceOfRandomness randomness = new SourceOfRandomness(new Random());
 
-        byte[] png = gen.generate(randomness);
-        gen.debugHex("Png", png);
+        for(int i = 0; i < 1; i++) {
 
-        try {
+            PngDataGenerator gen = new PngDataGenerator(true);
+            SourceOfRandomness randomness = new SourceOfRandomness(new Random());
 
-            FileOutputStream fos = new FileOutputStream("Debugging_Png.png");
-            fos.write(png);
-            fos.close();
+            byte[] png = gen.generate(randomness);
+            gen.debugHex("Png", png);
 
-        } catch (IOException e) {
-            e.printStackTrace();
+            try {
+
+                FileOutputStream fos = new FileOutputStream("Debugging_Png.png");
+                fos.write(png);
+                fos.close();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
