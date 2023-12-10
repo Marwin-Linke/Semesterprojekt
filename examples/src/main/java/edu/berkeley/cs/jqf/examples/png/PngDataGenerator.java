@@ -39,6 +39,8 @@ public class PngDataGenerator{
 
         try {
 
+            initializeParameters(randomness);
+
             png.write(generateSignature());
             png.write(generateIHDR(randomness));
             if(paletteUsed) {
@@ -60,53 +62,25 @@ public class PngDataGenerator{
         return new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
     }
 
-    private byte[] generateIHDR(SourceOfRandomness randomness){
+    private void initializeParameters(SourceOfRandomness randomness) {
 
-        ByteArrayOutputStream ihdr = new ByteArrayOutputStream();
+        this.imageWidth = intToByteArray(randomness.nextInt(1, 100));
+        this.imageHeight = intToByteArray(randomness.nextInt(1, 100));
 
-        try {
+        this.interlace = (byte) 0x00;
 
-            // initializes and randomizes IHDR options
+        initializeRandomColoring(randomness);
 
-            this.imageWidth = intToByteArray(randomness.nextInt(1, 100));
-            this.imageHeight = intToByteArray(randomness.nextInt(1, 100));
+        // DEBUGGING AREA
+        /*
+        this.imageHeight = intToByteArray(2);
+        this.imageWidth = intToByteArray(2);
+        initializeRandomColoring(randomness, 2, 8);
+        */
+        // END OF DEBUGGING AREA
 
-            this.interlace = (byte) 0x00;
-
-            initializeRandomColoring(randomness);
-
-            // for debug purposes
-            //this.imageHeight = intToByteArray(2);
-            //this.imageWidth = intToByteArray(2);
-            //initializeRandomColoring(randomness, 2, 8);
-
-            // initializes image layout parameters, based on the specified options
-
-            this.width = ByteBuffer.wrap(imageWidth).getInt();
-            this.height = ByteBuffer.wrap(imageHeight).getInt();
-
-            // writes options into the IHDR chunk
-
-            ihdr.write(imageWidth);
-            ihdr.write(imageHeight);
-            ihdr.write(bitsPerChannel);
-            ihdr.write(colorType);
-            // compression method is fixed at 0x00
-            ihdr.write(0x00);
-            // filter methods are always 0 in the IHDR, the difference comes in the image data!
-            ihdr.write(0x00);
-            ihdr.write(interlace);
-
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        byte[] ihdrBytes = constructChunk("IHDR".getBytes(), ihdr);
-
-        debugHex("IHDR", ihdrBytes);
-
-        return ihdrBytes;
+        this.width = ByteBuffer.wrap(imageWidth).getInt();
+        this.height = ByteBuffer.wrap(imageHeight).getInt();
 
     }
 
@@ -156,6 +130,36 @@ public class PngDataGenerator{
 
     private void initializeRandomColoring (SourceOfRandomness randomness) {
         initializeRandomColoring(randomness, -1, -1);
+    }
+
+    private byte[] generateIHDR(SourceOfRandomness randomness){
+
+        ByteArrayOutputStream ihdr = new ByteArrayOutputStream();
+
+        try {
+
+            // writes options into the IHDR chunk
+            ihdr.write(imageWidth);
+            ihdr.write(imageHeight);
+            ihdr.write(bitsPerChannel);
+            ihdr.write(colorType);
+            // compression method is fixed at 0x00
+            ihdr.write(0x00);
+            // filter methods are always 0 in the IHDR, the difference comes in the image data!
+            ihdr.write(0x00);
+            ihdr.write(interlace);
+
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        byte[] ihdrBytes = constructChunk("IHDR".getBytes(), ihdr);
+
+        debugHex("IHDR", ihdrBytes);
+
+        return ihdrBytes;
+
     }
 
     private byte[] generatePLTE(SourceOfRandomness randomness) {
