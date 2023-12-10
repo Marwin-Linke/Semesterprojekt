@@ -76,9 +76,9 @@ public class PngDataGenerator{
             initializeRandomColoring(randomness);
 
             // for debug purposes
-            //this.imageHeight = intToByteArray(32);
-            //this.imageWidth = intToByteArray(32);
-            //initializeRandomColoring(randomness, 4, 1);
+            //this.imageHeight = intToByteArray(2);
+            //this.imageWidth = intToByteArray(2);
+            //initializeRandomColoring(randomness, 2, 8);
 
             // initializes image layout parameters, based on the specified options
 
@@ -131,11 +131,15 @@ public class PngDataGenerator{
                 this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,4)));
                 this.colorType = 0x02;
                 this.channels = 3;
+                if(randomness.nextBoolean())
+                    paletteUsed = true;
                 break;
             case 3: // true color with alpha
                 this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(3,4)));
                 this.colorType = 0x06;
                 this.channels = 4;
+                if(randomness.nextBoolean())
+                    paletteUsed = true;
                 break;
             case 4: // indexed color, palette used
                 this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(4)));
