@@ -11,15 +11,22 @@ Here you can find our current progress.
 As for the generator, we still need to add a lot of functionality, this includes:
 
 * Interlacing
+* Implemented chunks
+  * `IHDR` (Image header)
+  * `IDAT` (Image data)
+  * `IEND` (Image trailer)
+  * `PLTE` (Palette)
+  * `tEXt` (Textual data)
+  * `zTXt` (Compressed textual data)
+* Implemented chunks but with unique failures
+  * `tRNS` (Transparency) is not reproducible 
+  * `iTXt` (International textual data) is reproducible
 * Remaining chunks
   * `tRNS` (Transparency)
   * `gAMA` (Image gamma)
   * `cHRM` (Primary chromaticities)
   * `sRGB` (Standard RGB color space)
   * `iCCP` (Embedded ICC profile)
-  * `tEXt` (Textual data)
-  * `zTXt` (Compressed textual data)
-  * `iTXt` (International textual data) 
   * `bKGD` (Background color)
   * `pHYs` (Physical pixel dimensions)
   * `sBIT` (Significant bits)
