@@ -34,6 +34,7 @@ public class PngDataGenerator{
     private boolean tEXtUsed;
     private boolean zTXtUsed;
     private boolean iTXtUsed;
+    private boolean gAMAUsed;
 
     // debugging
     private final boolean debugging;
@@ -54,28 +55,25 @@ public class PngDataGenerator{
 
             png.write(generateSignature());
             png.write(generateIHDR(randomness));
-            if(PLTEUsed) {
+            if(gAMAUsed)
+                png.write(generateGAMA(randomness));
+            if(PLTEUsed)
                 png.write(generatePLTE(randomness));
-            }
-            if(tRNSUsed) {
+            if(tRNSUsed)
                 png.write(generateTRNS(randomness));
-            }
-            if(tEXtUsed) {
+            if(tEXtUsed)
                 for(int i = 0; i < randomness.nextInt(1, 3); i++) {
                     png.write(generateTEXT(randomness));
                 }
-            }
-            if(zTXtUsed) {
+            if(zTXtUsed)
                 for(int i = 0; i < randomness.nextInt(1, 3); i++) {
                     png.write(generateZTXT(randomness));
                 }
-            }
             png.write(generateIDAT(randomness));
-            if(iTXtUsed) {
+            if(iTXtUsed)
                 for(int i = 0; i < randomness.nextInt(1, 3); i++) {
                     png.write(generateITXT(randomness));
                 }
-            }
             png.write(generateIEND());
 
         }
@@ -88,24 +86,24 @@ public class PngDataGenerator{
 
     private void resetParameters() {
 
-       imageWidth = new byte[4];
-       imageHeight = new byte[4];
-       bitsPerChannel = 0;
-       colorType = 0;
-       interlace = 0;
+        imageWidth = new byte[4];
+        imageHeight = new byte[4];
+        bitsPerChannel = 0;
+        colorType = 0;
+        interlace = 0;
 
-       width = 0;
-       height = 0;
-       channels = 0;
-       scanline = 0;
+        width = 0;
+        height = 0;
+        channels = 0;
+        scanline = 0;
 
-       PLTEUsed = false;
-       tRNSUsed = false;
-       transparencyMethod = 0;
-       tEXtUsed = false;
-       zTXtUsed = false;
-       iTXtUsed = false;
-
+        PLTEUsed = false;
+        tRNSUsed = false;
+        transparencyMethod = 0;
+        tEXtUsed = false;
+        zTXtUsed = false;
+        iTXtUsed = false;
+        gAMAUsed = false;
 
     }
 
@@ -126,6 +124,7 @@ public class PngDataGenerator{
         this.tEXtUsed = randomness.nextBoolean();
         this.zTXtUsed = randomness.nextBoolean();
         this.iTXtUsed = randomness.nextBoolean();
+        this.gAMAUsed = randomness.nextBoolean();
 
         // DEBUGGING AREA
         /*
@@ -233,6 +232,12 @@ public class PngDataGenerator{
 
         return ihdrBytes;
 
+    }
+
+    private byte[] generateGAMA(SourceOfRandomness randomness) {
+
+        byte[] gAMA = intToByteArray(randomness.nextInt(100001));
+        return constructChunk("gAMA".getBytes(), gAMA);
     }
 
     private byte[] generatePLTE(SourceOfRandomness randomness) {
@@ -676,15 +681,15 @@ public class PngDataGenerator{
         return calculateCRC(byteStream.toByteArray(), offset, length);
     }
 
-    private byte[] constructChunk(byte[] chunkType, ByteArrayOutputStream chunkContent) {
+    private byte[] constructChunk(byte[] chunkType, byte[] chunkContent) {
 
         ByteArrayOutputStream chunk = new ByteArrayOutputStream();
 
         try {
 
-            chunk.write(intToByteArray(chunkContent.size()));
+            chunk.write(intToByteArray(chunkContent.length));
             chunk.write(chunkType);
-            chunk.write(chunkContent.toByteArray());
+            chunk.write(chunkContent);
             chunk.write(calculateCRC(chunk, 4, chunk.size() - 4));
             // calculates CRC without the length
 
@@ -695,6 +700,10 @@ public class PngDataGenerator{
 
         return chunk.toByteArray();
 
+    }
+
+    private byte[] constructChunk(byte[] chunkType, ByteArrayOutputStream chunkContent) {
+        return constructChunk(chunkType, chunkContent.toByteArray());
     }
 
     public byte[] create_utf8(SourceOfRandomness randomness, int max_byte_number) {

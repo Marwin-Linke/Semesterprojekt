@@ -20,10 +20,9 @@ As for the generator, we still need to add a lot of functionality, this includes
   * `zTXt` (Compressed textual data)
   * `tRNS` (Transparency)
 * Implemented chunks but with unique failures
-  * `iTXt` (International textual data) is reproducible
+  * `iTXt` (International textual data) is reproducible in `testEditingPng`
+  * `gAMA` (Image gamma) is reproducible in `testMirroringPng`
 * Remaining chunks
-  * `tRNS` (Transparency)
-  * `gAMA` (Image gamma)
   * `cHRM` (Primary chromaticities)
   * `sRGB` (Standard RGB color space)
   * `iCCP` (Embedded ICC profile)
