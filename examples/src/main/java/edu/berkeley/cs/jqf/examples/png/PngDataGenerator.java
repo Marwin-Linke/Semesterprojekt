@@ -768,6 +768,12 @@ public class PngDataGenerator{
             str = str + randomness.nextChar((char) 0x0001, (char) 0x10FFFF); // uses maximum range of Unicode
         }
         byte[] bytes = Arrays.copyOfRange(str.getBytes(StandardCharsets.UTF_8), 0, str.length());
+        if(bytes.length > 0 && bytes.length < 5) {
+            for(int i = 0; i < bytes.length; i++) {
+                bytes[i] = (byte) randomness.nextInt(1, 127);
+            }
+            return bytes;
+        }
         return utf8_correction(bytes);
     }
 
