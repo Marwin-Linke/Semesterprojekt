@@ -35,6 +35,8 @@ public class PngDataGenerator{
     private boolean zTXtUsed;
     private boolean iTXtUsed;
     private boolean gAMAUsed;
+    private boolean cHRMUsed;
+    private boolean sRGBUsed;
 
     // debugging
     private final boolean debugging;
@@ -55,8 +57,12 @@ public class PngDataGenerator{
 
             png.write(generateSignature());
             png.write(generateIHDR(randomness));
+            if(sRGBUsed)
+                png.write(generateSRGB(randomness));
             if(gAMAUsed)
                 png.write(generateGAMA(randomness));
+            if(cHRMUsed)
+                png.write(generateCHRM(randomness));
             if(PLTEUsed)
                 png.write(generatePLTE(randomness));
             if(tRNSUsed)
@@ -104,6 +110,9 @@ public class PngDataGenerator{
         zTXtUsed = false;
         iTXtUsed = false;
         gAMAUsed = false;
+        cHRMUsed = false;
+        sRGBUsed = false;
+
 
     }
 
@@ -125,6 +134,12 @@ public class PngDataGenerator{
         this.zTXtUsed = randomness.nextBoolean();
         this.iTXtUsed = randomness.nextBoolean();
         this.gAMAUsed = randomness.nextBoolean();
+        this.cHRMUsed = randomness.nextBoolean();
+        this.sRGBUsed = randomness.nextBoolean();
+        if(sRGBUsed) {
+            this.gAMAUsed = true;
+            this.cHRMUsed = true;
+        }
 
         // DEBUGGING AREA
         /*
@@ -138,6 +153,8 @@ public class PngDataGenerator{
         this.iTXtUsed = true;
         */
         // END OF DEBUGGING AREA        
+
+
 
         this.width = ByteBuffer.wrap(imageWidth).getInt();
         this.height = ByteBuffer.wrap(imageHeight).getInt();
@@ -236,22 +253,61 @@ public class PngDataGenerator{
 
     private byte[] generateGAMA(SourceOfRandomness randomness) {
 
+        if(sRGBUsed) { // sRGB uses a fixed gAMA value
+            return constructChunk("gAMA".getBytes(), intToByteArray(45455));
+        }
+
         byte[] gAMA = intToByteArray(randomness.nextInt(100001));
         return constructChunk("gAMA".getBytes(), gAMA);
     }
 
+    private byte[] generateCHRM(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream cHRM = new ByteArrayOutputStream();
+
+        try {
+
+            if(sRGBUsed) { // sRGB uses fixed cHRM values
+                cHRM.write(intToByteArray(31270)); // white point x
+                cHRM.write(intToByteArray(32900)); // white point y
+                cHRM.write(intToByteArray(64000)); // red x
+                cHRM.write(intToByteArray(33000)); // red y
+                cHRM.write(intToByteArray(30000)); // green x
+                cHRM.write(intToByteArray(60000)); // green y
+                cHRM.write(intToByteArray(15000)); // blue x
+                cHRM.write(intToByteArray(6000)); // blue y
+            }
+            else {
+                for(int i = 0; i < 8; i++) {
+                    cHRM.write(intToByteArray(randomness.nextInt(100001))); // randomized values
+                }
+            }
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return constructChunk("cHRM".getBytes(), cHRM);
+    }
+
+    private byte[] generateSRGB(SourceOfRandomness randomness) {
+
+        byte[] sRGB = new byte[]{(byte) randomness.nextInt(4)};
+        return constructChunk("sRGB".getBytes(), sRGB);
+
+    }
     private byte[] generatePLTE(SourceOfRandomness randomness) {
 
-        ByteArrayOutputStream plte = new ByteArrayOutputStream();
+        ByteArrayOutputStream PLTE = new ByteArrayOutputStream();
 
         for(int i = 0; i < 256; i++) {
 
-            plte.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // red
-            plte.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // green
-            plte.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // blue
+            PLTE.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // red
+            PLTE.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // green
+            PLTE.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // blue
         }
 
-        return constructChunk("PLTE".getBytes(), plte);
+        return constructChunk("PLTE".getBytes(), PLTE);
 
     }
 

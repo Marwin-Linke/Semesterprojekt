@@ -22,9 +22,9 @@ As for the generator, we still need to add a lot of functionality, this includes
 * Implemented chunks but with unique failures
   * `iTXt` (International textual data) is reproducible in `testEditingPng`
   * `gAMA` (Image gamma) is reproducible in `testMirroringPng`
+  * `cHRM` (Primary chromaticities) is reproducible in `testMirroringPng`
+  * `sRGB` (Standard RGB color space) is dependent on `gAMA` and `cHRM` 
 * Remaining chunks
-  * `cHRM` (Primary chromaticities)
-  * `sRGB` (Standard RGB color space)
   * `iCCP` (Embedded ICC profile)
   * `bKGD` (Background color)
   * `pHYs` (Physical pixel dimensions)
