@@ -28,15 +28,15 @@ public class PngDataGenerator{
     private int scanline;
 
     // chunks
-    private boolean paletteUsed;
-    private boolean transparencyUsed;
+    private boolean PLTEUsed;
+    private boolean tRNSUsed;
     private int transparencyMethod;
     private boolean tEXtUsed;
     private boolean zTXtUsed;
     private boolean iTXtUsed;
 
     // debugging
-    private boolean debugging;
+    private final boolean debugging;
 
     public PngDataGenerator(boolean debugging){
         this.debugging = debugging;
@@ -54,26 +54,26 @@ public class PngDataGenerator{
 
             png.write(generateSignature());
             png.write(generateIHDR(randomness));
-            if(paletteUsed) {
+            if(PLTEUsed) {
                 png.write(generatePLTE(randomness));
             }
-            if(transparencyUsed) {
+            if(tRNSUsed) {
                 png.write(generateTRNS(randomness));
             }
             if(tEXtUsed) {
                 for(int i = 0; i < randomness.nextInt(1, 3); i++) {
-                    png.write(generatetEXt(randomness));
+                    png.write(generateTEXT(randomness));
                 }
             }
             if(zTXtUsed) {
                 for(int i = 0; i < randomness.nextInt(1, 3); i++) {
-                    png.write(generatezTXt(randomness));
+                    png.write(generateZTXT(randomness));
                 }
             }
             png.write(generateIDAT(randomness));
             if(iTXtUsed) {
                 for(int i = 0; i < randomness.nextInt(1, 3); i++) {
-                    png.write(generateiTXt(randomness));
+                    png.write(generateITXT(randomness));
                 }
             }
             png.write(generateIEND());
@@ -99,12 +99,13 @@ public class PngDataGenerator{
        channels = 0;
        scanline = 0;
 
-       paletteUsed = false;
-       transparencyUsed = false;
+       PLTEUsed = false;
+       tRNSUsed = false;
        transparencyMethod = 0;
        tEXtUsed = false;
        zTXtUsed = false;
        iTXtUsed = false;
+
 
     }
 
@@ -156,7 +157,7 @@ public class PngDataGenerator{
                 this.colorType = 0x00;
                 this.channels = 1;
                 if(randomness.nextBoolean()) {
-                    transparencyUsed = true;
+                    tRNSUsed = true;
                     transparencyMethod = 1;
                 }
                 break;
@@ -170,9 +171,9 @@ public class PngDataGenerator{
                 this.colorType = 0x02;
                 this.channels = 3;
                 if(randomness.nextBoolean())
-                    paletteUsed = true;
+                    PLTEUsed = true;
                 if(randomness.nextBoolean()) {
-                    transparencyUsed = true;
+                    tRNSUsed = true;
                     transparencyMethod = 2;
                 }
                 break;
@@ -181,15 +182,15 @@ public class PngDataGenerator{
                 this.colorType = 0x06;
                 this.channels = 4;
                 if(randomness.nextBoolean())
-                    paletteUsed = true;
+                    PLTEUsed = true;
                 break;
             case 4: // indexed color, palette used
                 this.bitsPerChannel = (byte) ((int) Math.pow(2, randomness.nextInt(4)));
                 this.colorType = 0x03;
                 this.channels = 1;
-                this.paletteUsed = true;
+                this.PLTEUsed = true;
                 if(randomness.nextBoolean()) {
-                    transparencyUsed = true;
+                    tRNSUsed = true;
                     transparencyMethod = 0;
                 }
                 break;
@@ -289,7 +290,7 @@ public class PngDataGenerator{
 
     }
 
-    private byte[] generatetEXt(SourceOfRandomness randomness) {
+    private byte[] generateTEXT(SourceOfRandomness randomness) {
 
         ByteArrayOutputStream tEXt = new ByteArrayOutputStream();
 
@@ -322,7 +323,7 @@ public class PngDataGenerator{
         return tEXtBytes;
     }
 
-    private byte[] generatezTXt(SourceOfRandomness randomness) {
+    private byte[] generateZTXT(SourceOfRandomness randomness) {
 
         ByteArrayOutputStream zTXt = new ByteArrayOutputStream();
         ByteArrayOutputStream zTXt_text = new ByteArrayOutputStream();
@@ -370,7 +371,7 @@ public class PngDataGenerator{
         return zTXtBytes;
     }
 
-    private byte[] generateiTXt(SourceOfRandomness randomness) {
+    private byte[] generateITXT(SourceOfRandomness randomness) {
 
         ByteArrayOutputStream iTXt = new ByteArrayOutputStream();
         ByteArrayOutputStream iTXt_text = new ByteArrayOutputStream();
