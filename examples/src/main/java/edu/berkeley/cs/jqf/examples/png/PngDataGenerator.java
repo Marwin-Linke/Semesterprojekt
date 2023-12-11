@@ -6,6 +6,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Random;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
@@ -29,6 +31,9 @@ public class PngDataGenerator{
     private boolean paletteUsed;
     private boolean transparencyUsed;
     private int transparencyMethod;
+    private boolean tEXtUsed;
+    private boolean zTXtUsed;
+    private boolean iTXtUsed;
 
     // debugging
     private boolean debugging;
@@ -53,7 +58,22 @@ public class PngDataGenerator{
             if(transparencyUsed) {
                 png.write(generateTRNS(randomness));
             }
+            if(tEXtUsed) {
+                for(int i = 0; i < randomness.nextInt(1, 3); i++) {
+                    png.write(generatetEXt(randomness));
+                }
+            }
+            if(zTXtUsed) {
+                for(int i = 0; i < randomness.nextInt(1, 3); i++) {
+                    png.write(generatezTXt(randomness));
+                }
+            }
             png.write(generateIDAT(randomness));
+            if(iTXtUsed) {
+                for(int i = 0; i < randomness.nextInt(1, 3); i++) {
+                    png.write(generateiTXt(randomness));
+                }
+            }
             png.write(generateIEND());
 
         }
@@ -78,6 +98,10 @@ public class PngDataGenerator{
 
         initializeRandomColoring(randomness);
 
+        this.tEXtUsed = randomness.nextBoolean();
+        this.zTXtUsed = randomness.nextBoolean();
+        this.iTXtUsed = randomness.nextBoolean();
+
         // DEBUGGING AREA
         /*
         this.imageHeight = intToByteArray(2);
@@ -85,8 +109,11 @@ public class PngDataGenerator{
         initializeRandomColoring(randomness, 4, 4);
         transparencyUsed = true;
         transparencyMethod = 0;
+        this.tEXtUsed = true;
+        this.zTXtUsed = true;
+        this.iTXtUsed = true;
         */
-        // END OF DEBUGGING AREA
+        // END OF DEBUGGING AREA        
 
         this.width = ByteBuffer.wrap(imageWidth).getInt();
         this.height = ByteBuffer.wrap(imageHeight).getInt();
@@ -221,6 +248,157 @@ public class PngDataGenerator{
 
         return constructChunk("tRNS".getBytes(), tRNS);
 
+    }
+
+    private byte[] generatetEXt(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream tEXt = new ByteArrayOutputStream();
+
+        // Keyword
+        for(int i = 0; i < randomness.nextInt(1, 79); i++) {
+            if(randomness.nextBoolean()) {
+                tEXt.write((byte) randomness.nextInt(32, 126));
+            } else {
+                tEXt.write((byte) randomness.nextInt(161, 255));
+            }
+        }
+        // Null separator
+        tEXt.write(0x00);
+        // Text
+        for(int i = 0; i < randomness.nextInt(1, 256); i++) { // 256 (could be maximum chunk size - 80)
+            int j = randomness.nextInt(1, 100);
+            if(j < 50) {
+                tEXt.write((byte) randomness.nextInt(32, 126));
+            } else if(j < 99) {
+                tEXt.write((byte) randomness.nextInt(161, 255));
+            } else {
+                tEXt.write((byte) 0x0A); // newline (with a probability of 2%)
+            }
+        }
+
+        byte[] tEXtBytes = constructChunk("tEXt".getBytes(), tEXt);
+
+        debugHex("tEXt", tEXtBytes);
+        
+        return tEXtBytes;
+    }
+
+    private byte[] generatezTXt(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream zTXt = new ByteArrayOutputStream();
+        ByteArrayOutputStream zTXt_text = new ByteArrayOutputStream();
+
+        // Keyword
+        for(int i = 0; i < randomness.nextInt(1, 79); i++) {
+            if(randomness.nextBoolean()) {
+                zTXt.write((byte) randomness.nextInt(32, 126));
+            } else {
+                zTXt.write((byte) randomness.nextInt(161, 255));
+            }
+        }
+        // Null separator
+        zTXt.write(0x00);
+        // Compression method
+        zTXt.write(0x00);
+        // Text
+        for(int i = 0; i < randomness.nextInt(1, 256); i++) { // 256 (could be maximum chunk size - 80)
+            int j = randomness.nextInt(1, 100);
+            if(j < 50) {
+                zTXt_text.write((byte) randomness.nextInt(32, 126));
+            } else if(j < 99) {
+                zTXt_text.write((byte) randomness.nextInt(161, 255));
+            } else {
+                zTXt_text.write((byte) 0x0A); // newline (with a probability of 2%)
+            }
+        }
+
+        int compressionMethod = 0; // 0 is the only defined compression method
+
+        Deflater deflater = new Deflater(compressionMethod);
+        deflater.setInput(zTXt_text.toByteArray());
+        deflater.finish();
+
+        byte[] compressedData = new byte[zTXt_text.toByteArray().length * 100 + 10];
+        int compressedLength = deflater.deflate(compressedData);
+        deflater.end();
+
+        zTXt.write(compressedData, 0, compressedLength);
+
+        byte[] zTXtBytes = constructChunk("zTXt".getBytes(), zTXt);
+
+        debugHex("zTXt", zTXtBytes);
+        
+        return zTXtBytes;
+    }
+
+    private byte[] generateiTXt(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream iTXt = new ByteArrayOutputStream();
+        ByteArrayOutputStream iTXt_text = new ByteArrayOutputStream();
+
+        try {
+            // Keyword
+            iTXt.write(create_utf8(randomness, randomness.nextInt(1, 79)));
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        // Null separator
+        iTXt.write(0x00);
+
+        // Compression flag (0 for uncompressed, 1 for compressed)
+        boolean isCompressed = randomness.nextBoolean();
+        iTXt.write((byte) (isCompressed ? 1 : 0));
+
+        // Compression method
+        int compressionMethod = 0; // 0 is the only defined compression method
+        iTXt.write(0x00);
+
+        try{
+            // Language tag
+            String[] languages = {"cn", "en-uk", "no-bok", "x-klingon"}; // hardcoded
+            if(randomness.nextBoolean()) {
+                iTXt.write(languages[randomness.nextInt(0, 3)].getBytes());
+            }
+            // Null separator
+            iTXt.write(0x00);
+
+            // Translated keyword
+            iTXt.write(create_utf8(randomness, randomness.nextInt(0, 100))); // this keyword can be longer than 79 bytes
+            // Null separator
+            iTXt.write(0x00);
+
+            // Text
+            iTXt_text.write(create_utf8(randomness, randomness.nextInt(0, 256))); // 256 (could be maximum chunk size - other data bytes of this chunk)
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        
+        if(isCompressed) {
+            Deflater deflater = new Deflater(compressionMethod);
+            deflater.setInput(iTXt_text.toByteArray());
+            deflater.finish();
+
+            byte[] compressedData = new byte[iTXt_text.toByteArray().length * 100 + 10];
+            int compressedLength = deflater.deflate(compressedData);
+            deflater.end();
+
+            iTXt.write(compressedData, 0, compressedLength);
+        } else {
+            try{
+                iTXt.write(iTXt_text.toByteArray());
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        byte[] iTXtBytes = constructChunk("iTXt".getBytes(), iTXt);
+
+        debugHex("iTXt", iTXtBytes);
+        
+        return iTXtBytes;
     }
 
     private byte[] generateIDAT(SourceOfRandomness randomness) {
@@ -477,6 +655,26 @@ public class PngDataGenerator{
 
         return chunk.toByteArray();
 
+    }
+
+    public byte[] create_utf8(SourceOfRandomness randomness, int max_byte_number) {
+        String str = "";
+        for(int i = 0; i < max_byte_number - 1; i++) {
+            str = str + randomness.nextChar((char) 0x0001, (char) 0x10FFFF); // uses maximum range of Unicode
+        }
+        byte[] bytes = Arrays.copyOfRange(str.getBytes(StandardCharsets.UTF_8), 0, str.length());
+        return utf8_correction(bytes);
+    }
+
+    public byte[] utf8_correction(byte[] b) { // removes wrong bytes from the end
+        if(b.length == 0) {return b;}
+        if((b[b.length-1] >> 7) == 0) {
+            return b;
+        }
+        if((b[b.length-1] >> 6) == -1) {
+            return Arrays.copyOfRange(b, 0, b.length - 1);
+        }
+        return utf8_correction(Arrays.copyOfRange(b, 0, b.length - 1));
     }
 
     public static void main(String[] args) {
