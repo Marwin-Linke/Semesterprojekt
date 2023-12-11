@@ -46,6 +46,8 @@ public class PngDataGenerator{
 
         ByteArrayOutputStream png = new ByteArrayOutputStream();
 
+        resetParameters();
+
         try {
 
             initializeParameters(randomness);
@@ -82,6 +84,28 @@ public class PngDataGenerator{
         }
 
         return png.toByteArray();
+    }
+
+    private void resetParameters() {
+
+       imageWidth = new byte[4];
+       imageHeight = new byte[4];
+       bitsPerChannel = 0;
+       colorType = 0;
+       interlace = 0;
+
+       width = 0;
+       height = 0;
+       channels = 0;
+       scanline = 0;
+
+       paletteUsed = false;
+       transparencyUsed = false;
+       transparencyMethod = 0;
+       tEXtUsed = false;
+       zTXtUsed = false;
+       iTXtUsed = false;
+
     }
 
     private byte[] generateSignature(){
@@ -229,21 +253,36 @@ public class PngDataGenerator{
 
         ByteArrayOutputStream tRNS = new ByteArrayOutputStream();
 
-        int bytes = 0;
+        // dependent on the bit-depth, all irrelevant zeros shall be 0
+        // the channel size stays 2 bytes for case 1 and 2
         switch(transparencyMethod) {
             case 0: // for indexed colors, artificial alpha palette
-                bytes = 256;
+                for(int i = 0; i < 256; i++) {
+                    tRNS.write((byte) (randomness.nextInt((int) Math.pow(2, 8))));
+                }
                 break;
             case 1: // for grayscale, single alpha value for specified bytes
-                bytes = 2;
+                if(bitsPerChannel == 0x10){
+                    tRNS.write((byte) (randomness.nextInt((int) Math.pow(2, 8))));
+                    tRNS.write((byte) (randomness.nextInt((int) Math.pow(2, 8))));
+                }
+                else {
+                    tRNS.write(0x00);
+                    tRNS.write((byte) (randomness.nextInt((int) Math.pow(2, bitsPerChannel))));
+                }
                 break;
             case 2: // for true color, single alpha value for specified bytes
-                bytes = 6;
+                for (int i = 0; i < 3 ; i++) {
+                    if(bitsPerChannel == 0x10){
+                        tRNS.write((byte) (randomness.nextInt((int) Math.pow(2, 8))));
+                        tRNS.write((byte) (randomness.nextInt((int) Math.pow(2, 8))));
+                    }
+                    else {
+                        tRNS.write(0x00);
+                        tRNS.write((byte) (randomness.nextInt((int) Math.pow(2, bitsPerChannel))));
+                    }
+                }
                 break;
-        }
-
-        for(int i = 0; i < bytes; i++) {
-            tRNS.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // alpha
         }
 
         return constructChunk("tRNS".getBytes(), tRNS);

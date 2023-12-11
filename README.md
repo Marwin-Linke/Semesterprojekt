@@ -18,8 +18,8 @@ As for the generator, we still need to add a lot of functionality, this includes
   * `PLTE` (Palette)
   * `tEXt` (Textual data)
   * `zTXt` (Compressed textual data)
+  * `tRNS` (Transparency)
 * Implemented chunks but with unique failures
-  * `tRNS` (Transparency) is not reproducible 
   * `iTXt` (International textual data) is reproducible
 * Remaining chunks
   * `tRNS` (Transparency)
