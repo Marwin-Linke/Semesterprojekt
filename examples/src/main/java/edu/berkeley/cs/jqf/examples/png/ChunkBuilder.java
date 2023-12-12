@@ -3,6 +3,7 @@ package edu.berkeley.cs.jqf.examples.png;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.zip.CRC32;
+import java.util.zip.Deflater;
 
 import static edu.berkeley.cs.jqf.examples.png.PngDataGenerator.intToByteArray;
 
@@ -51,6 +52,26 @@ public class ChunkBuilder {
 
     public static byte[] constructChunk(byte[] chunkType, ByteArrayOutputStream chunkContent) {
         return constructChunk(chunkType, chunkContent.toByteArray());
+    }
+
+    public static byte[] compressData(int compressionMethod, byte[] data) {
+        Deflater deflater = new Deflater(compressionMethod);
+        deflater.setInput(data);
+        deflater.finish();
+
+        ByteArrayOutputStream compressedData = new ByteArrayOutputStream();
+        //byte[] compressedData = new byte[filteredData.length];
+
+        byte[] buffer = new byte[1024];
+        while (!deflater.finished()) {
+            int compressedLength = deflater.deflate(buffer);
+            compressedData.write(buffer, 0, compressedLength);
+
+        }
+        deflater.end();
+
+        return compressedData.toByteArray();
+
     }
 
 }

@@ -2,9 +2,7 @@ package edu.berkeley.cs.jqf.examples.png;
 
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -128,24 +126,20 @@ public class PngDataGenerator{
         }
 
         // DEBUGGING AREA
-        //this.tEXtUsed = false;
-        //this.zTXtUsed = false;
-        //this.iTXtUsed = false;
-        //this.gAMAUsed = false;
-        //this.cHRMUsed = false;
-        //this.sRGBUsed = false;
-        //this.PLTEUsed = true;
-        //this.tRNSUsed = false;
         /*
-        this.imageHeight = intToByteArray(2);
-        this.imageWidth = intToByteArray(2);
-        initializeRandomColoring(randomness, 4, 4);
-        transparencyUsed = true;
-        transparencyMethod = 0;
+        this.initializeRandomColoring(randomness, 2, 8);
+        this.tEXtUsed = false;
+        this.zTXtUsed = false;
+        this.iTXtUsed = false;
+        this.gAMAUsed = false;
+        this.cHRMUsed = false;
+        this.sRGBUsed = false;
+        this.PLTEUsed = false;
+        this.tRNSUsed = false;
+        this.imageHeight = intToByteArray(10);
+        this.imageWidth = intToByteArray(10);
         */
-        // END OF DEBUGGING AREA        
-
-
+        // END OF DEBUGGING AREA
 
         this.width = ByteBuffer.wrap(imageWidth).getInt();
         this.height = ByteBuffer.wrap(imageHeight).getInt();
@@ -291,14 +285,18 @@ public class PngDataGenerator{
 
         ByteArrayOutputStream PLTE = new ByteArrayOutputStream();
 
-        for(int i = 0; i < 256; i++) {
+        for(int i = 0; i < (int) Math.pow(2, bitsPerChannel); i++) {
 
             PLTE.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // red
             PLTE.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // green
             PLTE.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // blue
         }
 
-        return ChunkBuilder.constructChunk("PLTE".getBytes(), PLTE);
+        byte[] PLTEChunk = ChunkBuilder.constructChunk("PLTE".getBytes(), PLTE);
+
+        debugHex("PLTE", PLTEChunk);
+
+        return PLTEChunk;
 
     }
 
@@ -406,15 +404,8 @@ public class PngDataGenerator{
 
         int compressionMethod = 0; // 0 is the only defined compression method
 
-        Deflater deflater = new Deflater(compressionMethod);
-        deflater.setInput(zTXt_text.toByteArray());
-        deflater.finish();
-
-        byte[] compressedData = new byte[zTXt_text.toByteArray().length * 100 + 10];
-        int compressedLength = deflater.deflate(compressedData);
-        deflater.end();
-
-        zTXt.write(compressedData, 0, compressedLength);
+        byte[] compressedData = ChunkBuilder.compressData(compressionMethod, zTXt_text.toByteArray());
+        zTXt.write(compressedData, 0, compressedData.length);
 
         byte[] zTXtBytes = ChunkBuilder.constructChunk("zTXt".getBytes(), zTXt);
 
@@ -468,15 +459,10 @@ public class PngDataGenerator{
         }
         
         if(isCompressed) {
-            Deflater deflater = new Deflater(compressionMethod);
-            deflater.setInput(iTXt_text.toByteArray());
-            deflater.finish();
 
-            byte[] compressedData = new byte[iTXt_text.toByteArray().length * 100 + 10];
-            int compressedLength = deflater.deflate(compressedData);
-            deflater.end();
+            byte[] compressedData = ChunkBuilder.compressData(compressionMethod, iTXt_text.toByteArray());
+            iTXt.write(compressedData, 0, compressedData.length);
 
-            iTXt.write(compressedData, 0, compressedLength);
         } else {
             try{
                 iTXt.write(iTXt_text.toByteArray());
@@ -502,22 +488,14 @@ public class PngDataGenerator{
         ByteArrayOutputStream idat = new ByteArrayOutputStream();
 
         int compressionMethod = randomness.nextInt(-1,9);
+        byte[] compressedData = ChunkBuilder.compressData(compressionMethod, filteredData);
+        idat.write(compressedData, 0, compressedData.length);
 
-        Deflater deflater = new Deflater(compressionMethod);
-        deflater.setInput(filteredData);
-        deflater.finish();
+        byte[] idatChunk = ChunkBuilder.constructChunk("IDAT".getBytes(), idat);
 
-        byte[] compressedData = new byte[filteredData.length * 100 + 10];
-        int compressedLength = deflater.deflate(compressedData);
-        deflater.end();
+        debugHex("IDAT", idatChunk);
 
-        idat.write(compressedData, 0, compressedLength);
-
-        byte[] idatBytes = ChunkBuilder.constructChunk("IDAT".getBytes(), idat);
-
-        debugHex("IDAT", idatBytes);
-
-        return idatBytes;
+        return idatChunk;
     }
 
     private byte[] generateFilteredData(SourceOfRandomness randomness){
