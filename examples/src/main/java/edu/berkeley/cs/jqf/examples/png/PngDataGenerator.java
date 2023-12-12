@@ -9,7 +9,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Random;
-import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 
 public class PngDataGenerator{
@@ -17,26 +16,16 @@ public class PngDataGenerator{
     // IHDR values
     private byte[] imageWidth = new byte[4];
     private byte[] imageHeight = new byte[4];
-    private byte bitsPerChannel;
-    private byte colorType;
-    private byte interlace;
+    private byte bitsPerChannel, colorType, interlace;
 
     // image data values
-    private int width;
-    private int height;
-    private int channels;
-    private int scanline;
+    private int width, height, channels, scanline;
 
     // chunks
-    private boolean PLTEUsed;
-    private boolean tRNSUsed;
+    private boolean PLTEUsed, tRNSUsed;
     private int transparencyMethod;
-    private boolean tEXtUsed;
-    private boolean zTXtUsed;
-    private boolean iTXtUsed;
-    private boolean gAMAUsed;
-    private boolean cHRMUsed;
-    private boolean sRGBUsed;
+    private boolean tEXtUsed, zTXtUsed, iTXtUsed;
+    private boolean gAMAUsed, cHRMUsed, sRGBUsed;
 
     // debugging
     private final boolean debugging;
@@ -91,7 +80,6 @@ public class PngDataGenerator{
     }
 
     private void resetParameters() {
-
         imageWidth = new byte[4];
         imageHeight = new byte[4];
         bitsPerChannel = 0;
@@ -112,8 +100,6 @@ public class PngDataGenerator{
         gAMAUsed = false;
         cHRMUsed = false;
         sRGBUsed = false;
-
-
     }
 
     private byte[] generateSignature(){
@@ -143,14 +129,20 @@ public class PngDataGenerator{
 
         // DEBUGGING AREA
         /*
+        this.tEXtUsed = false;
+        this.zTXtUsed = false;
+        this.iTXtUsed = false;
+        this.gAMAUsed = false;
+        this.cHRMUsed = false;
+        this.sRGBUsed = false;
+        this.PLTEUsed = true;
+        this.tRNSUsed = false;
+        /*
         this.imageHeight = intToByteArray(2);
         this.imageWidth = intToByteArray(2);
         initializeRandomColoring(randomness, 4, 4);
         transparencyUsed = true;
         transparencyMethod = 0;
-        this.tEXtUsed = true;
-        this.zTXtUsed = true;
-        this.iTXtUsed = true;
         */
         // END OF DEBUGGING AREA        
 
@@ -243,7 +235,7 @@ public class PngDataGenerator{
             e.printStackTrace();
         }
 
-        byte[] ihdrBytes = constructChunk("IHDR".getBytes(), ihdr);
+        byte[] ihdrBytes = ChunkBuilder.constructChunk("IHDR".getBytes(), ihdr);
 
         debugHex("IHDR", ihdrBytes);
 
@@ -254,11 +246,11 @@ public class PngDataGenerator{
     private byte[] generateGAMA(SourceOfRandomness randomness) {
 
         if(sRGBUsed) { // sRGB uses a fixed gAMA value
-            return constructChunk("gAMA".getBytes(), intToByteArray(45455));
+            return ChunkBuilder.constructChunk("gAMA".getBytes(), intToByteArray(45455));
         }
 
         byte[] gAMA = intToByteArray(randomness.nextInt(100001));
-        return constructChunk("gAMA".getBytes(), gAMA);
+        return ChunkBuilder.constructChunk("gAMA".getBytes(), gAMA);
     }
 
     private byte[] generateCHRM(SourceOfRandomness randomness) {
@@ -287,13 +279,13 @@ public class PngDataGenerator{
             e.printStackTrace();
         }
 
-        return constructChunk("cHRM".getBytes(), cHRM);
+        return ChunkBuilder.constructChunk("cHRM".getBytes(), cHRM);
     }
 
     private byte[] generateSRGB(SourceOfRandomness randomness) {
 
         byte[] sRGB = new byte[]{(byte) randomness.nextInt(4)};
-        return constructChunk("sRGB".getBytes(), sRGB);
+        return ChunkBuilder.constructChunk("sRGB".getBytes(), sRGB);
 
     }
     private byte[] generatePLTE(SourceOfRandomness randomness) {
@@ -307,7 +299,7 @@ public class PngDataGenerator{
             PLTE.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // blue
         }
 
-        return constructChunk("PLTE".getBytes(), PLTE);
+        return ChunkBuilder.constructChunk("PLTE".getBytes(), PLTE);
 
     }
 
@@ -347,7 +339,7 @@ public class PngDataGenerator{
                 break;
         }
 
-        return constructChunk("tRNS".getBytes(), tRNS);
+        return ChunkBuilder.constructChunk("tRNS".getBytes(), tRNS);
 
     }
 
@@ -377,7 +369,7 @@ public class PngDataGenerator{
             }
         }
 
-        byte[] tEXtBytes = constructChunk("tEXt".getBytes(), tEXt);
+        byte[] tEXtBytes = ChunkBuilder.constructChunk("tEXt".getBytes(), tEXt);
 
         debugHex("tEXt", tEXtBytes);
         
@@ -425,7 +417,7 @@ public class PngDataGenerator{
 
         zTXt.write(compressedData, 0, compressedLength);
 
-        byte[] zTXtBytes = constructChunk("zTXt".getBytes(), zTXt);
+        byte[] zTXtBytes = ChunkBuilder.constructChunk("zTXt".getBytes(), zTXt);
 
         debugHex("zTXt", zTXtBytes);
         
@@ -495,7 +487,7 @@ public class PngDataGenerator{
             }
         }
 
-        byte[] iTXtBytes = constructChunk("iTXt".getBytes(), iTXt);
+        byte[] iTXtBytes = ChunkBuilder.constructChunk("iTXt".getBytes(), iTXt);
 
         debugHex("iTXt", iTXtBytes);
         
@@ -522,7 +514,7 @@ public class PngDataGenerator{
 
         idat.write(compressedData, 0, compressedLength);
 
-        byte[] idatBytes = constructChunk("IDAT".getBytes(), idat);
+        byte[] idatBytes = ChunkBuilder.constructChunk("IDAT".getBytes(), idat);
 
         debugHex("IDAT", idatBytes);
 
@@ -557,7 +549,7 @@ public class PngDataGenerator{
                 imageData[position] = imageByte;
 
                 // the filter is added onto each byte based on the filter method
-                byte filteredImageByte = addFilter(filterMethod, imageData, position);
+                byte filteredImageByte = Filter.addFilter(filterMethod, imageData, position, scanline, channels);
                 imageData[position] = filteredImageByte;
             }
         }
@@ -565,134 +557,6 @@ public class PngDataGenerator{
         return imageData;
 
     }
-
-
-    private byte addFilter(int filterMethod, byte[] imageData, int position){
-        switch (filterMethod) {
-            case 1:
-                return subFilter(imageData, position);
-            case 2:
-                return upFilter(imageData, position);
-            case 3:
-                return averageFilter(imageData, position);
-            case 4:
-                return paethFilter(imageData, position);
-            default:
-                return imageData[position];
-        }
-    }
-
-    private byte subFilter(byte[] imageData, int position) {
-
-        byte filteredImageByte;
-
-        // first pixel of each scanline is ignored
-        if(position % scanline < channels) {
-            filteredImageByte = imageData[position];
-        }
-        else {
-            int sub = imageData[position] - imageData[position - channels];
-            int mod = Integer.remainderUnsigned(sub, 256);
-            filteredImageByte = (byte) mod;
-        }
-
-        return filteredImageByte;
-
-    }
-
-    private byte upFilter(byte[] imageData, int position) {
-
-        byte filteredImageByte;
-
-        // first scanline is ignored
-        if(position < scanline) {
-            filteredImageByte =  imageData[position];
-        }
-        else {
-            int sub = imageData[position] - imageData[position - scanline];
-            int mod = Integer.remainderUnsigned(sub, 256);
-            filteredImageByte = (byte) mod;
-        }
-
-        return filteredImageByte;
-
-    }
-
-    private byte averageFilter(byte[] imageData, int position) {
-
-        byte filteredImageByte;
-
-        // first pixel of each scanline and the first scanline itself are ignored
-        if(position < scanline || position % scanline < channels) {
-            filteredImageByte = imageData[position];
-        }
-        else {
-            int left = imageData[position - channels];
-            int up = imageData[position - scanline];
-            int subAverage = imageData[position] - (left + up) / 2;
-            int mod = Integer.remainderUnsigned(subAverage, 256);
-            filteredImageByte = (byte) mod;
-        }
-
-        return filteredImageByte;
-
-    }
-
-    private byte paethFilter(byte[] imageData, int position) {
-
-        byte filteredImageByte;
-
-        // first pixel of each scanline and the first scanline itself are ignored
-        if(position < scanline || position % scanline < channels) {
-            filteredImageByte = imageData[position];
-        }
-        else {
-            int left = imageData[position - channels];
-            int above = imageData[position - scanline];
-            int upperLeft = imageData[position - scanline - channels];
-            int subPaeth = imageData[position] - PaethPredictor(left, above, upperLeft);
-            int mod = Integer.remainderUnsigned(subPaeth, 256);
-            filteredImageByte = (byte) mod;
-        }
-
-        return filteredImageByte;
-
-    }
-
-    private int PaethPredictor(int left, int above, int upperLeft) {
-
-        // paeth predictor is an algorithm used for the paeth filter
-
-        int p = left + above - upperLeft;
-        int pLeft = Math.abs(p - left);
-        int pAbove = Math.abs(p - above);
-        int pUpperLeft = Math.abs(p - upperLeft);
-        if(pLeft <= pAbove && pLeft <= pUpperLeft) {
-            return left;
-        }
-        else if(pAbove <= pUpperLeft) {
-            return above;
-        }
-        return upperLeft;
-    }
-
-    /*
-    PSEUDO-CODE by libpng
-
-    function PaethPredictor (a, b, c)
-       begin
-            ; a = left, b = above, c = upper left
-            p := a + b - c        ; initial estimate
-            pa := abs(p - a)      ; distances to a, b, c
-            pb := abs(p - b)
-            pc := abs(p - c)
-            ; return nearest of a,b,c,
-            ; breaking ties in order a,b,c.
-            if pa <= pb AND pa <= pc then return a
-            else if pb <= pc then return b
-            else return c
-       end
-     */
 
     private byte[] generateIEND(){
 
@@ -713,53 +577,8 @@ public class PngDataGenerator{
             System.out.println(name + ": " + byteArrayToHex(bytes));
     }
 
-    private static byte[] intToByteArray(int value) {
+    public static byte[] intToByteArray(int value) {
         return ByteBuffer.allocate(4).putInt(value).array();
-    }
-
-    private static byte[] calculateCRC(byte[] bytes){
-        CRC32 crc = new CRC32();
-        crc.update(bytes);
-        return intToByteArray((int)crc.getValue());
-    }
-
-    private static byte[] calculateCRC(byte[] bytes, int offset, int length){
-        CRC32 crc = new CRC32();
-        crc.update(bytes, offset, length);
-        return intToByteArray((int)crc.getValue());
-    }
-
-    private static byte[] calculateCRC(ByteArrayOutputStream byteStream){
-        return calculateCRC(byteStream.toByteArray());
-    }
-
-    private static byte[] calculateCRC(ByteArrayOutputStream byteStream, int offset, int length){
-        return calculateCRC(byteStream.toByteArray(), offset, length);
-    }
-
-    private byte[] constructChunk(byte[] chunkType, byte[] chunkContent) {
-
-        ByteArrayOutputStream chunk = new ByteArrayOutputStream();
-
-        try {
-
-            chunk.write(intToByteArray(chunkContent.length));
-            chunk.write(chunkType);
-            chunk.write(chunkContent);
-            chunk.write(calculateCRC(chunk, 4, chunk.size() - 4));
-            // calculates CRC without the length
-
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return chunk.toByteArray();
-
-    }
-
-    private byte[] constructChunk(byte[] chunkType, ByteArrayOutputStream chunkContent) {
-        return constructChunk(chunkType, chunkContent.toByteArray());
     }
 
     public byte[] create_utf8(SourceOfRandomness randomness, int max_byte_number) {
