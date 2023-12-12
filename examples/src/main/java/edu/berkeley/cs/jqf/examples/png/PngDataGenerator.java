@@ -128,15 +128,14 @@ public class PngDataGenerator{
         }
 
         // DEBUGGING AREA
-        /*
-        this.tEXtUsed = false;
-        this.zTXtUsed = false;
-        this.iTXtUsed = false;
-        this.gAMAUsed = false;
-        this.cHRMUsed = false;
-        this.sRGBUsed = false;
-        this.PLTEUsed = true;
-        this.tRNSUsed = false;
+        //this.tEXtUsed = false;
+        //this.zTXtUsed = false;
+        //this.iTXtUsed = false;
+        //this.gAMAUsed = false;
+        //this.cHRMUsed = false;
+        //this.sRGBUsed = false;
+        //this.PLTEUsed = true;
+        //this.tRNSUsed = false;
         /*
         this.imageHeight = intToByteArray(2);
         this.imageWidth = intToByteArray(2);
