@@ -23,11 +23,11 @@ As for the generator, we still need to add a lot of functionality, this includes
   * `cHRM` (Primary chromaticities)
   * `sRGB` (Standard RGB color space)
   * `iTXt` (International textual data)
+  * `bKGD` (Background color)
 * Implemented chunks but with unique failures
   * `testMirroringPng` causes the error message "missing palette", `PLTE` is probably not working correctly
 * Remaining chunks
   * `iCCP` (Embedded ICC profile)
-  * `bKGD` (Background color)
   * `pHYs` (Physical pixel dimensions)
   * `sBIT` (Significant bits)
   * `sPLT` (Suggested palette)
