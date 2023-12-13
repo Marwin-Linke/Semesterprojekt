@@ -23,7 +23,7 @@ public class PngDataGenerator{
     private int transparencyMethod;
     private boolean tEXtUsed, zTXtUsed, iTXtUsed;
     private boolean gAMAUsed, cHRMUsed, sRGBUsed;
-    private boolean bGKDUsed;
+    private boolean bGKDUsed, pHYsUsed;
     private int backgroundMethod;
 
     // debugging
@@ -57,6 +57,8 @@ public class PngDataGenerator{
                 png.write(generateTRNS(randomness));
             if(bGKDUsed)
                 png.write(generateBKGD(randomness));
+            if(pHYsUsed)
+                png.write(generatePHYS(randomness));
             if(tEXtUsed)
                 for(int i = 0; i < randomness.nextInt(1, 3); i++) {
                     png.write(generateTEXT(randomness));
@@ -103,6 +105,7 @@ public class PngDataGenerator{
         sRGBUsed = false;
         bGKDUsed = false;
         backgroundMethod = 0;
+        pHYsUsed = false;
     }
 
     private byte[] generateSignature(){
@@ -130,6 +133,7 @@ public class PngDataGenerator{
             this.cHRMUsed = true;
         }
         this.bGKDUsed = randomness.nextBoolean();
+        this.pHYsUsed = randomness.nextBoolean();
 
         // DEBUGGING AREA
         /*
@@ -362,6 +366,24 @@ public class PngDataGenerator{
         catch (IOException e) { e.printStackTrace(); }
 
         return ChunkBuilder.constructChunk("bKGD".getBytes(), bKGD);
+
+    }
+
+    private byte[] generatePHYS(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream pHYs = new ByteArrayOutputStream();
+
+        // specifies the aspect ratio between x and y in pixels
+        try {
+            pHYs.write(intToByteArray(randomness.nextInt(100))); // x
+            pHYs.write(intToByteArray(randomness.nextInt(100))); // y
+            pHYs.write((byte) randomness.nextInt(0, 1)); // unknown unit or meter
+        }
+        catch (IOException e) { e.printStackTrace(); }
+
+        debugHex("pHYs", pHYs.toByteArray());
+
+        return ChunkBuilder.constructChunk("pHYs".getBytes(), pHYs);
 
     }
 
