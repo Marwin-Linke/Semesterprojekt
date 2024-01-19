@@ -92,6 +92,10 @@ public class ZestCLI implements Runnable{
             description = "Blind fuzzing: do not use coverage feedback (default: false)")
     private boolean blindFuzzing;
 
+    @Option(names = {"--fastInstrumentation"},
+            description = "Enable fast non-colliding instrumentation (default: false)")
+    private boolean useFastNonCollidingInstrumentation = false;
+
     @Parameters(index = "0", paramLabel = "PACKAGE", description = "package containing the fuzz target and all dependencies")
     private String testPackageName;
 
@@ -140,6 +144,9 @@ public class ZestCLI implements Runnable{
             System.setProperty("jqf.ei.LIBFUZZER_COMPAT_OUTPUT", "true");
         }
 
+        if (this.useFastNonCollidingInstrumentation) {
+            System.setProperty("useFastNonCollidingCoverageInstrumentation", String.valueOf(true));
+        }
 
         try {
             ClassLoader loader = new InstrumentingClassLoader(

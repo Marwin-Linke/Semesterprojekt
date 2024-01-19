@@ -103,6 +103,14 @@ public class FuzzGoal extends AbstractMojo {
     private String testMethod;
 
     /**
+     * The instrumentation method.
+     *
+     * <p>One of 'janala' and 'fast'. Default is 'fast'.</p>
+     */
+    @Parameter(property="instrumentation", defaultValue="janala")
+    private String instrumentation;
+
+    /**
      * Comma-separated list of FQN prefixes to exclude from
      * coverage instrumentation.
      *
@@ -293,6 +301,18 @@ public class FuzzGoal extends AbstractMojo {
         Log log = getLog();
         PrintStream out = log.isDebugEnabled() ? System.out : null;
         Result result;
+
+        // Configure instrumentation
+        switch (instrumentation) {
+            case "fast":
+                System.setProperty("useFastNonCollidingCoverageInstrumentation", String.valueOf(true));
+                break;
+            case "janala":
+                System.setProperty("useFastNonCollidingCoverageInstrumentation", String.valueOf(false));
+                break;
+            default:
+                throw new MojoExecutionException("Unknown instrumentation method: " + instrumentation);
+        }
 
         // Configure classes to instrument
         if (excludes != null) {

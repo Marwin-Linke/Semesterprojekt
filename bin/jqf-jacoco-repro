@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Figure out script absolute path
+pushd `dirname $0` > /dev/null
+BIN_DIR=`pwd`
+popd > /dev/null
+
+ROOT_DIR=`dirname $BIN_DIR`
+
+print_usage() {
+  echo "Usage: $0 [-c CLASSPATH] [-i] [-v] [-r] OUT_DIR TEST_CLASS TEST_METHOD INPUT_FILE.."
+}
+
+while getopts ":c:ivre" opt; do
+  case $opt in
+    /?)
+      echo "Invalid option: -$OPTARG" >&2
+      print_usage >&1
+      exit 1
+      ;;
+    c)
+      export CLASSPATH="$OPTARG"
+      ;;
+    i)
+      instrument=1
+      ;;
+    r)
+      results=1
+      ;;
+    v)
+      verbose=1
+      export JVM_OPTS="$JVM_OPTS -Djqf.logCoverage=true -Djanala.verbose=true"
+      ;;
+    e)
+      export JVM_OPTS="$JVM_OPTS -Djqf.tracing.MATCH_CALLEE_NAMES=true -Djqf.tracing.TRACE_GENERATORS=true"
+      ;;
+  esac
+done
+shift $((OPTIND-1))
+
+OUT_DIR=$1
+if [ -d $OUT_DIR ]; then
+  if ! [ -z "$(ls -A $OUT_DIR)" ]; then
+    echo "Output dir $OUT_DIR already exists and is not empty. Delete or clear the directory (or specify a different one) and re-run the script."
+    exit 1
+  fi
+else
+  mkdir -p $OUT_DIR
+fi
+
+# Setup JaCoCo
+export JVM_OPTS="$JVM_OPTS -javaagent:${ROOT_DIR}/jacoco/lib/jacocoagent.jar=append=false,destfile=$OUT_DIR/jacoco.exec,classdumpdir=$OUT_DIR/classdump"
+
+
+if [ -n "$verbose" -o -n "$results" ]; then
+  export JVM_OPTS="-Djqf.repro.traceDir=. $JVM_OPTS"
+fi
+
+if [ -z "$instrument" ]; then
+  export JQF_DISABLE_INSTRUMENTATION=1
+fi
+
+# Check arguments
+if [ $# -lt 4 ]; then
+  print_usage >&1
+  exit 1
+fi
+
+if [ -z "$OUT_DIR" ]; then
+  echo "Please specify the output dir using the -o option."
+  exit 1
+fi
+
+# Run the repro input driver
+$ROOT_DIR/scripts/jqf-driver.sh edu.berkeley.cs.jqf.fuzz.repro.ReproDriver "${@:2}"
