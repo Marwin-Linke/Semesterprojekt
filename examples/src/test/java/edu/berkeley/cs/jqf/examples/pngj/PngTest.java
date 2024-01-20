@@ -107,7 +107,7 @@ public class PngTest {
         }
     }
 
-    private void readPng (PngData pngData) {
+    private void  readPng (PngData pngData) {
 
         InputStream stream = new ByteArrayInputStream(pngData.data);
         PngReader pngr = new PngReader(stream);

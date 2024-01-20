@@ -23,7 +23,7 @@ public class PngDataGenerator{
     private int transparencyMethod;
     private boolean tEXtUsed, zTXtUsed, iTXtUsed;
     private boolean gAMAUsed, cHRMUsed, sRGBUsed;
-    private boolean bGKDUsed, pHYsUsed;
+    private boolean bGKDUsed, pHYsUsed, sBITUsed;
     private int backgroundMethod;
 
     // debugging
@@ -45,6 +45,8 @@ public class PngDataGenerator{
 
             png.write(generateSignature());
             png.write(generateIHDR(randomness));
+            if(sBITUsed)
+                png.write(generateSBIT(randomness));
             if(sRGBUsed)
                 png.write(generateSRGB(randomness));
             if(gAMAUsed)
@@ -106,6 +108,7 @@ public class PngDataGenerator{
         bGKDUsed = false;
         backgroundMethod = 0;
         pHYsUsed = false;
+        sBITUsed = false;
     }
 
     private byte[] generateSignature(){
@@ -134,6 +137,7 @@ public class PngDataGenerator{
         }
         this.bGKDUsed = randomness.nextBoolean();
         this.pHYsUsed = randomness.nextBoolean();
+        this.sBITUsed = randomness.nextBoolean();
 
         // DEBUGGING AREA
         /*
@@ -249,6 +253,39 @@ public class PngDataGenerator{
 
         return ihdrBytes;
 
+    }
+
+    private byte[] generateSBIT(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream sBit = new ByteArrayOutputStream();
+
+        switch (colorType) {
+            case 0:
+                sBit.write(randomness.nextInt(1, bitsPerChannel));
+                break;
+            case 2:
+                sBit.write(randomness.nextInt(1, bitsPerChannel));
+                sBit.write(randomness.nextInt(1, bitsPerChannel));
+                sBit.write(randomness.nextInt(1, bitsPerChannel));
+                break;
+            case 3:
+                sBit.write(randomness.nextInt(1, 8));
+                sBit.write(randomness.nextInt(1, 8));
+                sBit.write(randomness.nextInt(1, 8));
+                break;
+            case 4:
+                sBit.write(randomness.nextInt(1, bitsPerChannel));
+                sBit.write(randomness.nextInt(1, bitsPerChannel));
+                break;
+            case 6:
+                sBit.write(randomness.nextInt(1, bitsPerChannel));
+                sBit.write(randomness.nextInt(1, bitsPerChannel));
+                sBit.write(randomness.nextInt(1, bitsPerChannel));
+                sBit.write(randomness.nextInt(1, bitsPerChannel));
+                break;
+        }
+
+        return ChunkBuilder.constructChunk("sBIT".getBytes(), sBit);
     }
 
     private byte[] generateGAMA(SourceOfRandomness randomness) {
