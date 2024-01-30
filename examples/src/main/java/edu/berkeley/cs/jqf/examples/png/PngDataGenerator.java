@@ -8,6 +8,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Random;
 
+
+/*
+Script Testing
+
+bin/jqf-zest -f -c $(scripts/examples_classpath.sh) edu.berkeley.cs.jqf.examples.pngj.PngTest testEditingPng
+bin/jqf-jacoco-repro -c $(scripts/examples_classpath.sh) jacoco-output5 edu.berkeley.cs.jqf.examples.pngj.PngTest testEditingPng fuzz-results/corpus/*
+java -jar jacoco/lib/jacococli.jar report jacoco-output5/jacoco.exec --html jacoco-output5/report --classfiles examples/target/dependency/pngj-2.1.0.jar
+
+ */
+
 public class PngDataGenerator{
 
     // IHDR values
@@ -22,9 +32,11 @@ public class PngDataGenerator{
     private boolean PLTEUsed, tRNSUsed;
     private int transparencyMethod;
     private boolean tEXtUsed, zTXtUsed, iTXtUsed;
-    private boolean gAMAUsed, cHRMUsed, sRGBUsed;
+    private boolean gAMAUsed, cHRMUsed, sRGBUsed, iCCPUsed;
     private boolean bGKDUsed, pHYsUsed, sBITUsed;
+    private boolean sPLTUsed, tIMEUsed, hISTUsed;
     private int backgroundMethod;
+    private int PLTEEntries;
 
     // debugging
     private final boolean debugging;
@@ -53,6 +65,8 @@ public class PngDataGenerator{
                 png.write(generateGAMA(randomness));
             if(cHRMUsed)
                 png.write(generateCHRM(randomness));
+            if(iCCPUsed)
+                png.write(generateICCP(randomness));
             if(PLTEUsed)
                 png.write(generatePLTE(randomness));
             if(tRNSUsed)
@@ -61,6 +75,14 @@ public class PngDataGenerator{
                 png.write(generateBKGD(randomness));
             if(pHYsUsed)
                 png.write(generatePHYS(randomness));
+            if(hISTUsed)
+                png.write(generateHIST(randomness));
+            if(tIMEUsed)
+                png.write(generateTIME(randomness));
+            if(sPLTUsed)
+                for(int i = 0; i < randomness.nextInt(1, 3); i++) {
+                    png.write(generateSPLT(randomness));
+                }
             if(tEXtUsed)
                 for(int i = 0; i < randomness.nextInt(1, 3); i++) {
                     png.write(generateTEXT(randomness));
@@ -69,7 +91,12 @@ public class PngDataGenerator{
                 for(int i = 0; i < randomness.nextInt(1, 3); i++) {
                     png.write(generateZTXT(randomness));
                 }
-            png.write(generateIDAT(randomness));
+
+            if(interlace == 0x01)
+                png.write(generateInterlacedIDATChunks(randomness));
+            else
+                png.write(generateIDAT(randomness));
+
             if(iTXtUsed)
                 for(int i = 0; i < randomness.nextInt(1, 3); i++) {
                     png.write(generateITXT(randomness));
@@ -109,6 +136,10 @@ public class PngDataGenerator{
         backgroundMethod = 0;
         pHYsUsed = false;
         sBITUsed = false;
+        sPLTUsed = false;
+        tIMEUsed = false;
+        hISTUsed = false;
+        iCCPUsed = false;
     }
 
     private byte[] generateSignature(){
@@ -118,10 +149,13 @@ public class PngDataGenerator{
 
     private void initializeParameters(SourceOfRandomness randomness) {
 
-        this.imageWidth = intToByteArray(randomness.nextInt(1, 100));
-        this.imageHeight = intToByteArray(randomness.nextInt(1, 100));
+        this.imageWidth = intToByteArray(randomness.nextInt(1, 10));
+        this.imageHeight = intToByteArray(randomness.nextInt(1, 10));
 
-        this.interlace = (byte) 0x00;
+        if(randomness.nextBoolean())
+            this.interlace = 0x00;
+        else
+            this.interlace = 0x01;
 
         initializeRandomColoring(randomness);
 
@@ -135,9 +169,14 @@ public class PngDataGenerator{
             this.gAMAUsed = true;
             this.cHRMUsed = true;
         }
+        this.iCCPUsed = randomness.nextBoolean();
         this.bGKDUsed = randomness.nextBoolean();
         this.pHYsUsed = randomness.nextBoolean();
         this.sBITUsed = randomness.nextBoolean();
+        this.sPLTUsed = randomness.nextBoolean();
+        if(colorType == 0x03)
+            this.hISTUsed = randomness.nextBoolean();
+        this.tIMEUsed = randomness.nextBoolean();
 
         // DEBUGGING AREA
         /*
@@ -333,11 +372,46 @@ public class PngDataGenerator{
         return ChunkBuilder.constructChunk("sRGB".getBytes(), sRGB);
 
     }
+
+    private byte[] generateICCP(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream iCCP = new ByteArrayOutputStream();
+        ByteArrayOutputStream iCCP_text = new ByteArrayOutputStream();
+
+        // Keyword
+        appendRandomString(iCCP, 1, 79, randomness);
+        // Null separator
+        iCCP.write(0x00);
+        // Compression method
+        iCCP.write(0x00);
+        // Text
+        for(int i = 0; i < randomness.nextInt(1, 256); i++) { // 256 (could be maximum chunk size - 80)
+            int j = randomness.nextInt(1, 100);
+            if(j < 50) {
+                iCCP_text.write((byte) randomness.nextInt(32, 126));
+            } else if(j < 99) {
+                iCCP_text.write((byte) randomness.nextInt(161, 255));
+            } else {
+                iCCP_text.write((byte) 0x0A); // newline (with a probability of 2%)
+            }
+        }
+
+        int compressionMethod = 0; // 0 is the only defined compression method
+
+        byte[] compressedData = ChunkBuilder.compressData(compressionMethod, iCCP_text.toByteArray());
+        iCCP.write(compressedData, 0, compressedData.length);
+
+        return ChunkBuilder.constructChunk("iCCP".getBytes(), iCCP);
+    }
+
+
     private byte[] generatePLTE(SourceOfRandomness randomness) {
 
         ByteArrayOutputStream PLTE = new ByteArrayOutputStream();
 
-        for(int i = 0; i < (int) Math.pow(2, bitsPerChannel); i++) {
+        PLTEEntries = (int) Math.pow(2, bitsPerChannel);
+
+        for(int i = 0; i < PLTEEntries; i++) {
 
             PLTE.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // red
             PLTE.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // green
@@ -424,18 +498,81 @@ public class PngDataGenerator{
 
     }
 
+    private byte[] generateSPLT(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream sPLT = new ByteArrayOutputStream();
+
+        try {
+            // Keyword
+            appendRandomString(sPLT, 1, 79, randomness);
+            // Null separator
+            sPLT.write(0x00);
+
+            sPLT.write(bitsPerChannel);
+
+            for (int i = 0; i < randomness.nextInt(0, 10); i++) {
+
+                if (bitsPerChannel == 16) {
+                    sPLT.write(int2ToByteArray(randomness.nextInt((int) Math.pow(2, 16)))); // red
+                    sPLT.write(int2ToByteArray(randomness.nextInt((int) Math.pow(2, 16)))); // green
+                    sPLT.write(int2ToByteArray(randomness.nextInt((int) Math.pow(2, 16)))); // blue
+                }
+                else {
+                    sPLT.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // red
+                    sPLT.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // green
+                    sPLT.write((byte) (randomness.nextInt((int) Math.pow(2, 8)))); // blue
+                }
+
+                sPLT.write(int2ToByteArray(randomness.nextInt((int) Math.pow(2, 16)))); // frequency
+
+            }
+        }
+        catch (IOException e) { e.printStackTrace(); }
+
+        return ChunkBuilder.constructChunk("sPLT".getBytes(), sPLT);
+
+    }
+
+    private byte[] generateHIST(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream hIST = new ByteArrayOutputStream();
+
+        try {
+            for(int i = 0; i < PLTEEntries; i++) {
+                hIST.write(int2ToByteArray(randomness.nextInt((int) Math.pow(2, 16))));
+            }
+        }
+        catch (IOException e) { e.printStackTrace(); }
+
+        return ChunkBuilder.constructChunk("hIST".getBytes(), hIST);
+
+    }
+
+    private byte[] generateTIME(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream tIME = new ByteArrayOutputStream();
+
+        try {
+            tIME.write(int2ToByteArray(randomness.nextInt((int) Math.pow(2, 16)))); // years
+            tIME.write((byte) randomness.nextInt(1, 12)); // months
+            tIME.write((byte) randomness.nextInt(1, 31)); // days
+            tIME.write((byte) randomness.nextInt(0, 23)); // hours
+            tIME.write((byte) randomness.nextInt(0, 59)); // minutes
+            tIME.write((byte) randomness.nextInt(0, 60)); // seconds (plus leap second)
+        }
+        catch (IOException e) { e.printStackTrace(); }
+
+        return ChunkBuilder.constructChunk("tIME".getBytes(), tIME);
+
+    }
+
     private byte[] generateTEXT(SourceOfRandomness randomness) {
 
         ByteArrayOutputStream tEXt = new ByteArrayOutputStream();
 
         // Keyword
-        for(int i = 0; i < randomness.nextInt(1, 79); i++) {
-            if(randomness.nextBoolean()) {
-                tEXt.write((byte) randomness.nextInt(32, 126));
-            } else {
-                tEXt.write((byte) randomness.nextInt(161, 255));
-            }
-        }
+        appendRandomString(tEXt, 1, 79, randomness);
+
         // Null separator
         tEXt.write(0x00);
         // Text
@@ -463,13 +600,7 @@ public class PngDataGenerator{
         ByteArrayOutputStream zTXt_text = new ByteArrayOutputStream();
 
         // Keyword
-        for(int i = 0; i < randomness.nextInt(1, 79); i++) {
-            if(randomness.nextBoolean()) {
-                zTXt.write((byte) randomness.nextInt(32, 126));
-            } else {
-                zTXt.write((byte) randomness.nextInt(161, 255));
-            }
-        }
+        appendRandomString(zTXt, 1, 79, randomness);
         // Null separator
         zTXt.write(0x00);
         // Compression method
@@ -563,6 +694,61 @@ public class PngDataGenerator{
         return iTXtBytes;
     }
 
+    private byte[] generateInterlacedIDATChunks(SourceOfRandomness randomness) {
+
+        ByteArrayOutputStream IDATChunks = new ByteArrayOutputStream();
+
+        int originalWidth = width;
+        int originalHeight = height;
+
+        try{
+
+            // Pass 1
+            IDATChunks.write(generateInterlacedIDAT(
+                    originalWidth, originalHeight, 8, 8, randomness
+            ));
+
+            // Pass 2
+            IDATChunks.write(generateInterlacedIDAT(
+                    originalWidth, originalHeight, 4, 8, randomness
+            ));
+
+            // Pass 3
+            IDATChunks.write(generateInterlacedIDAT(
+                    originalWidth, originalHeight, 4, 4, randomness
+            ));
+
+            // Pass 4
+            IDATChunks.write(generateInterlacedIDAT(
+                    originalWidth, originalHeight, 2, 4, randomness
+            ));
+
+            // Pass 5
+            IDATChunks.write(generateInterlacedIDAT(
+                    originalWidth, originalHeight, 2, 2, randomness
+            ));
+
+            // Pass 6
+            IDATChunks.write(generateInterlacedIDAT(
+                    originalWidth, originalHeight, 1, 2, randomness
+            ));
+
+            // Pass 7
+            IDATChunks.write(generateInterlacedIDAT(
+                    originalWidth, originalHeight, 1, 1, randomness
+            ));
+        }
+        catch (IOException e) { e.printStackTrace(); }
+
+        return IDATChunks.toByteArray();
+    }
+
+    private byte[] generateInterlacedIDAT(int originalWidth, int originalHeight, int widthDivisor, int heightDivisor, SourceOfRandomness randomness) {
+        width = (int) Math.ceil((float)originalWidth / widthDivisor);
+        height = (int) Math.ceil((float)originalHeight / heightDivisor);
+        return generateIDAT(randomness);
+    }
+
     private byte[] generateIDAT(SourceOfRandomness randomness) {
 
         byte[] filteredData = generateFilteredData(randomness);
@@ -644,6 +830,17 @@ public class PngDataGenerator{
 
     public static byte[] int2ToByteArray(int value) {
         return ByteBuffer.allocate(2).putShort((short) value).array();
+    }
+
+    public static void appendRandomString(ByteArrayOutputStream stream, int min, int max, SourceOfRandomness randomness) {
+
+        for(int i = 0; i < randomness.nextInt(min, max); i++) {
+            if(randomness.nextBoolean()) {
+                stream.write((byte) randomness.nextInt(32, 126));
+            } else {
+                stream.write((byte) randomness.nextInt(161, 255));
+            }
+        }
     }
 
     public byte[] create_utf8(SourceOfRandomness randomness, int max_byte_number) {

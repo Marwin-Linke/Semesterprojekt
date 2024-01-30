@@ -10,7 +10,7 @@ Here you can find our current progress.
 
 As for the generator, we still need to add a lot of functionality, this includes:
 
-* Interlacing
+* Interlacing (Completed)
 * Implemented chunks
   * `IHDR` (Image header)
   * `IDAT` (Image data)
@@ -25,17 +25,15 @@ As for the generator, we still need to add a lot of functionality, this includes
   * `iTXt` (International textual data)
   * `bKGD` (Background color)
   * `pHYs` (Physical pixel dimensions)
-* Implemented chunks but with unique failures
-  * `testMirroringPng` causes the error message "missing palette", `PLTE` is probably not working correctly
-* Remaining chunks
   * `iCCP` (Embedded ICC profile)
   * `sBIT` (Significant bits)
   * `sPLT` (Suggested palette)
   * `hIST` (Palette histogram)
   * `tIME` (Image last-modification time)
-* Chunk ordering
-* Compatibility checks
-* `APNG`
+* Implemented chunks but with unique failures
+  * `testMirroringPng` causes the error message "missing palette", `PLTE` is probably not working correctly
+  * Interlacing may cause unique failures (or not, IDK)
+  * Jacoco returns 0 coverage for the `hIST` chunk although implemented
 
 ### Driver
 
