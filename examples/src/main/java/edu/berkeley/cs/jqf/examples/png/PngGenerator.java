@@ -10,7 +10,7 @@ public class PngGenerator extends Generator<PngData> {
 
     public PngGenerator() {
         super(PngData.class);
-        generator = new PngDataGenerator(false);
+        generator = new PngDataGenerator(false, true);
     }
 
     @Override
