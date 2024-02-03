@@ -3,6 +3,8 @@ package edu.berkeley.cs.jqf.examples.pngj;
 import ar.com.hjg.pngj.*;
 import ar.com.hjg.pngj.chunks.ChunkCopyBehaviour;
 import ar.com.hjg.pngj.chunks.PngChunkTextVar;
+import ar.com.hjg.pngj.chunks.PngChunkPLTE;
+import ar.com.hjg.pngj.chunks.PngChunkTRNS;
 import com.pholser.junit.quickcheck.From;
 import edu.berkeley.cs.jqf.fuzz.Fuzz;
 import edu.berkeley.cs.jqf.fuzz.JQF;
@@ -15,40 +17,58 @@ import java.io.*;
 @RunWith(JQF.class)
 public class PngTest {
 
-    @Fuzz
-    public void testOpeningPng(@From(PngGenerator.class) PngData pngData) {
 
-        createPngFile(pngData, "Original_Png");
-        readPng(pngData);
+    @Fuzz
+    public void testPngPipeline(@From(PngGenerator.class) PngData pngInput) {
+
+        PngData currentData;
+        PngReader currentReader;
+
+        currentReader = readPng(pngInput);
+
+        if(currentReader.imgInfo.indexed) { // Indexed => True Color
+            currentData = convertToTrueColor(currentReader);
+            currentReader = readPng(currentData);
+        }
+        if(currentReader.imgInfo.channels >= 3) { // True Color => Grayscale
+            currentData = desaturateColors(currentReader);
+            currentReader = readPng(currentData);
+            currentData = convertToGrayscale(currentReader);
+            currentReader = readPng(currentData);
+        }
+
+        currentData = mirrorPng(currentReader);
+        currentReader = readPng(currentData);
+
+        currentReader.close();
 
     }
 
-    @Fuzz
-    public void testEditingPng(@From(PngGenerator.class) PngData pngData) {
+    public PngData convertToTrueColor(PngReader pngr) {
+        PngChunkPLTE plte = pngr.getMetadata().getPLTE();
+        PngChunkTRNS trns = pngr.getMetadata().getTRNS(); // transparency metadata, can be null
+        boolean alpha = trns != null;
+        ImageInfo im2 = new ImageInfo(pngr.imgInfo.cols, pngr.imgInfo.rows, 8, alpha);
 
-        PngData editedPng = changeColors(pngData); // reads png and changes color
-
-        readPng(editedPng); // reads png and closes reader
-
-        createPngFile(pngData, "Original_Png"); // creates local png file
-
-        createPngFile(editedPng, "Edited_Png");
-
-    }
-
-    private PngData changeColors(PngData pngData) {
-
-        InputStream stream = new ByteArrayInputStream(pngData.data);
-        PngReader pngr = new PngReader(stream);
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        PngWriter pngw = new PngWriter(outputStream, im2);
+        pngw.copyChunksFrom(pngr.getChunksList(), ChunkCopyBehaviour.COPY_ALL_SAFE);
+        int[] buf = null;
+        for (int row = 0; row < pngr.imgInfo.rows; row++) {
+            ImageLineInt line1 = (ImageLineInt) pngr.readRow(row);
+            buf = ImageLineHelper.palette2rgb(line1, plte, trns, buf);
+            ImageLineInt line2 = new ImageLineInt(pngw.imgInfo, buf);
+            pngw.writeRow(line2);
+        }
+        pngr.end();
+        pngw.end();
+        return new PngData(outputStream.toByteArray());
+    }
 
-
+    private PngData desaturateColors(PngReader pngr) {
 
         int channels = pngr.imgInfo.channels;
-        Assume.assumeTrue(channels >= 3);
-        Assume.assumeTrue(pngr.imgInfo.bitDepth == 8);
-
-        //File editedPng = new File("Edited_Png.png");
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PngWriter pngw = new PngWriter(outputStream, pngr.imgInfo);
         pngw.copyChunksFrom(pngr.getChunksList(), ChunkCopyBehaviour.COPY_ALL_SAFE);
         pngw.getMetadata().setText(PngChunkTextVar.KEY_Description, "Decreased red and increased green");
@@ -56,30 +76,57 @@ public class PngTest {
             IImageLine l1 = pngr.readRow();
             int[] scanline = ((ImageLineInt) l1).getScanline(); // to save typing
             for (int j = 0; j < pngr.imgInfo.cols; j++) {
-                scanline[j * channels] /= 2;
-                scanline[j * channels + 1] = ImageLineHelper.clampTo_0_255(scanline[j * channels + 1] + 20);
+
+                int red = scanline[j * channels];
+                int green = scanline[j * channels + 1];
+                int blue = scanline[j * channels + 2];
+                int maxValue = Math.max(red, Math.max(green, blue));
+                scanline[j * channels] = ImageLineHelper.clampTo_0_65535(maxValue);
+                scanline[j * channels + 1] = ImageLineHelper.clampTo_0_65535(maxValue);
+                scanline[j * channels + 2] = ImageLineHelper.clampTo_0_65535(maxValue);
+
             }
             pngw.writeRow(l1);
         }
-
-        pngr.end(); // it's recommended to end the reader first, in case there are trailing chunks to read
+        pngr.end();
         pngw.end();
 
-        PngData editedPngData = new PngData(outputStream.toByteArray());
-
-        //testMirroringPng(editedPngData);
-
-        return editedPngData;
+        return new PngData(outputStream.toByteArray());
 
     }
 
-    @Fuzz
-    public void testMirroringPng(@From(PngGenerator.class) PngData pngData) {
+    public PngData convertToGrayscale(PngReader pngr) {
+
+        ImageInfo grayscaleInfo = new ImageInfo(
+                pngr.imgInfo.cols,
+                pngr.imgInfo.rows,
+                pngr.imgInfo.bitDepth,
+                pngr.imgInfo.alpha,
+                true,
+                false
+        );
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        PngWriter pngw = new PngWriter(outputStream, grayscaleInfo);
+        pngw.copyChunksFrom(pngr.getChunksList(), ChunkCopyBehaviour.COPY_ALL_SAFE);
+        for (int row = 0; row < pngr.imgInfo.rows; row++) { // also: while(pngr.hasMoreRows())
+            IImageLine l1 = pngr.readRow();
+            int[] scanline = ((ImageLineInt) l1).getScanline(); // to save typing
+            int[] buffer = new int[pngw.imgInfo.bytesPerRow];
+            for (int j = 0; j < pngr.imgInfo.cols; j++) {
+                buffer[j] = scanline[j * pngr.imgInfo.channels];
+            }
+            ImageLineInt line2 = new ImageLineInt(pngw.imgInfo, buffer);
+            pngw.writeRow(line2);
+        }
+        pngr.end();
+        pngw.end();
+        return new PngData(outputStream.toByteArray());
+    }
 
-        InputStream stream = new ByteArrayInputStream(pngData.data);
-        PngReader pngr = new PngReader(stream);
+    public PngData mirrorPng(PngReader pngr) {
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PngWriter pngw = new PngWriter(outputStream, pngr.imgInfo);
         pngw.copyChunksFrom(pngr.getChunksList(), ChunkCopyBehaviour.COPY_ALL_SAFE);
         for (int row = 0; row < pngr.imgInfo.rows; row++) {
@@ -90,10 +137,7 @@ public class PngTest {
         pngr.end();
         pngw.end();
 
-        createPngFile(pngData, "Original_Png");
-
-        createPngFile(new PngData(outputStream.toByteArray()), "Mirrored_Png");
-
+        return new PngData(outputStream.toByteArray());
     }
 
     private static void mirrorLineInt(ImageInfo imgInfo, int[] line) { // unpacked line
@@ -107,12 +151,11 @@ public class PngTest {
         }
     }
 
-    private void  readPng (PngData pngData) {
+    private PngReader readPng (PngData pngData) {
 
         InputStream stream = new ByteArrayInputStream(pngData.data);
         PngReader pngr = new PngReader(stream);
-        pngr.end();
-
+        return pngr;
     }
 
     public static byte[] extractBytes (File file) {
