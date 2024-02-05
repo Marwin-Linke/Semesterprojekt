@@ -40,11 +40,25 @@ public class PngDataGenerator{
 
     // debugging
     private final boolean debugging;
-    private boolean fullRange;
+    private final boolean fullRange;
+    /**
+     * BASELINE CRITERIA:
+     * The baseline includes:
+     * - All critical chunks: IHDR, IDAT, PLTE, IEND
+     * - All color types
+     * - Only bit-depth of 8
+     * - Only default compression
+     * - no interlacing
+     * - no filtering
+     */
+    private final boolean baseline;
 
-    public PngDataGenerator(boolean debugging, boolean fullRange){
+
+
+    public PngDataGenerator(boolean debugging, boolean fullRange, boolean baseline){
         this.debugging = debugging;
         this.fullRange = fullRange;
+        this.baseline = baseline;
     }
 
     public byte[] generate(SourceOfRandomness randomness) {
@@ -154,28 +168,34 @@ public class PngDataGenerator{
         this.imageWidth = intToByteArray(generateRandomInt(1, 10, randomness));
         this.imageHeight = intToByteArray(generateRandomInt(1, 10, randomness));
 
-        this.interlace = randomness.nextBoolean() ? (byte) 1 : (byte) 0;
-
-        initializeRandomColoring(randomness);
-
-        this.tEXtUsed = randomness.nextBoolean();
-        this.zTXtUsed = randomness.nextBoolean();
-        this.iTXtUsed = randomness.nextBoolean();
-        this.gAMAUsed = randomness.nextBoolean();
-        this.cHRMUsed = randomness.nextBoolean();
-        this.sRGBUsed = randomness.nextBoolean();
-        if(sRGBUsed) {
-            this.gAMAUsed = true;
-            this.cHRMUsed = true;
+        if(baseline) {
+            initializeBaselineColoring(randomness);
         }
-        this.iCCPUsed = randomness.nextBoolean();
-        this.bGKDUsed = randomness.nextBoolean();
-        this.pHYsUsed = randomness.nextBoolean();
-        this.sBITUsed = randomness.nextBoolean();
-        this.sPLTUsed = randomness.nextBoolean();
-        if(colorType == 0x03)
-            this.hISTUsed = randomness.nextBoolean();
-        this.tIMEUsed = randomness.nextBoolean();
+        else {
+            initializeRandomColoring(randomness);
+
+            this.interlace = randomness.nextBoolean() ? (byte) 1 : (byte) 0;
+
+            this.tEXtUsed = randomness.nextBoolean();
+            this.zTXtUsed = randomness.nextBoolean();
+            this.iTXtUsed = randomness.nextBoolean();
+            this.gAMAUsed = randomness.nextBoolean();
+            this.cHRMUsed = randomness.nextBoolean();
+            this.sRGBUsed = randomness.nextBoolean();
+            if(sRGBUsed) {
+                this.gAMAUsed = true;
+                this.cHRMUsed = true;
+            }
+            this.iCCPUsed = randomness.nextBoolean();
+            this.bGKDUsed = randomness.nextBoolean();
+            this.pHYsUsed = randomness.nextBoolean();
+            this.sBITUsed = randomness.nextBoolean();
+            this.sPLTUsed = randomness.nextBoolean();
+            if(colorType == 0x03)
+                this.hISTUsed = randomness.nextBoolean();
+            this.tIMEUsed = randomness.nextBoolean();
+        }
+
 
         // DEBUGGING AREA
         /*
@@ -257,6 +277,38 @@ public class PngDataGenerator{
 
         if (bitDepth != -1)
             this.bitsPerChannel = (byte) bitDepth;
+    }
+
+    private void initializeBaselineColoring(SourceOfRandomness randomness) {
+
+        int colorMethod = randomness.nextInt(5);
+
+        switch (colorMethod) {
+            case 0: // grayscale
+                this.colorType = 0x00;
+                this.channels = 1;
+                break;
+            case 1: // grayscale with alpha
+                this.colorType = 0x04;
+                this.channels = 2;
+                break;
+            case 2: // true color
+                this.colorType = 0x02;
+                this.channels = 3;
+                break;
+            case 3: // true color with alpha
+                this.colorType = 0x06;
+                this.channels = 4;
+                break;
+            case 4: // indexed color, palette used
+                this.colorType = 0x03;
+                this.channels = 1;
+                this.PLTEUsed = true;
+                break;
+
+        }
+
+        this.bitsPerChannel = (byte) 8;
     }
 
     private void initializeRandomColoring (SourceOfRandomness randomness) {
@@ -756,7 +808,7 @@ public class PngDataGenerator{
 
         ByteArrayOutputStream idat = new ByteArrayOutputStream();
 
-        int compressionMethod = generateRandomInt(-1, 8, randomness);
+        int compressionMethod = baseline ? 0 : generateRandomInt(-1, 8, randomness);
         byte[] compressedData = ChunkBuilder.compressData(compressionMethod, filteredData);
         idat.write(compressedData, 0, compressedData.length);
 
@@ -778,7 +830,7 @@ public class PngDataGenerator{
         for (int y = 0; y < height; y++) {
 
             // each line can opt for a different filter method
-            int filterMethod = (byte) randomness.nextInt(5);
+            int filterMethod = baseline ? 0 : (byte) randomness.nextInt(5);
 
             //filterMethod = 0;
             // the first byte of each scanline defines the filter method
@@ -900,7 +952,7 @@ public class PngDataGenerator{
 
         for(int i = 0; i < 1; i++) {
 
-            PngDataGenerator gen = new PngDataGenerator(true, true);
+            PngDataGenerator gen = new PngDataGenerator(true, true,true);
             SourceOfRandomness randomness = new SourceOfRandomness(new Random());
 
             byte[] png = gen.generate(randomness);
