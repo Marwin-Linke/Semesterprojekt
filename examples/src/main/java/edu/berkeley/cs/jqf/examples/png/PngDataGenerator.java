@@ -13,8 +13,8 @@ import java.util.Random;
 Script Testing
 
 bin/jqf-zest -f -c $(scripts/examples_classpath.sh) edu.berkeley.cs.jqf.examples.pngj.PngTest testPngPipeline
-bin/jqf-jacoco-repro -c $(scripts/examples_classpath.sh) jacoco-output5 edu.berkeley.cs.jqf.examples.pngj.PngTest testPngPipeline fuzz-results/corpus/*
-java -jar jacoco/lib/jacococli.jar report jacoco-output5/jacoco.exec --html jacoco-output5/report --classfiles examples/target/dependency/pngj-2.1.0.jar
+bin/jqf-jacoco-repro -c $(scripts/examples_classpath.sh) jacoco-output_baseline edu.berkeley.cs.jqf.examples.pngj.PngTest testPngPipeline fuzz-results/corpus/*
+java -jar jacoco/lib/jacococli.jar report jacoco-output_baseline/jacoco.exec --html jacoco-output_baseline/report --classfiles examples/target/dependency/pngj-2.1.0.jar
 
  */
 

@@ -30,6 +30,7 @@ public class PngTest {
             currentData = convertToTrueColor(currentReader);
             currentReader = readPng(currentData);
         }
+
         if(currentReader.imgInfo.channels >= 3) { // True Color => Grayscale
             currentData = desaturateColors(currentReader);
             currentReader = readPng(currentData);
