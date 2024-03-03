@@ -8,7 +8,6 @@ import ar.com.hjg.pngj.chunks.PngChunkTRNS;
 import com.pholser.junit.quickcheck.From;
 import edu.berkeley.cs.jqf.fuzz.Fuzz;
 import edu.berkeley.cs.jqf.fuzz.JQF;
-import org.junit.Assume;
 import org.junit.runner.RunWith;
 import edu.berkeley.cs.jqf.examples.png.*;
 
