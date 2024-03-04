@@ -10,6 +10,7 @@
 %
 % If you use the hyperref package, please uncomment the following line
 % to display URLs in blue roman font according to Springer's eBook style:
+% \usepackage{hyperref}
 % \renewcommand\UrlFont{\color{blue}\rmfamily}
 
 \begin{document}
@@ -48,10 +49,67 @@ TODO: Security: Beschreibt mögliche Sicherheitslücken im Zusammenhang mit dem 
 
 \section{Implementation}
 \subsection{Tools}
-TODO: Tools: Gebt einen kurzen Überblick über die von euch verwendeten Libraries. Beschreibt wie diese Libraries verwendet werden können um Dateien eures Datenformats zu generieren bzw. zu verarbeiten.
-\subsection{Generator}
-TODO: Generator: Beschreibt im Detail die Implementation eures Generators. Begründet dabei Design-Entscheidungen sowie von euch verwendete Heuristiken.
-\subsection{Fuzz Driver}
+\subsubsection{JQF}
+The coverage-guided testing platform for Java named JQF, developed by R. Padhye, C. Lemieux and K. Sen, is designed for \textit{practitioners}, who want to find bugs in Java programs, as well as for \textit{researchers}, who wish to implement new fuzzing algorithms~\cite{JQF_paper}. For our project, we used JQF to implement a fuzzing generator based on the file format PNG, which can be directly used in JQF to run test drivers for matching libraries.
+\subsubsection{PNGJ}
+As for the library to test, we chose PNGJ, which is a pure, open-source Java library for high-performance reading and writing of PNG images~\cite{PNGJ_github}. For our use case, mainly the reading capability of PNGJ was tested by the fuzzer.
+\subsubsection{Java Standard Library}
+A large component of writing PNG files are the compression algorithms, CRC32 checksums and Adler32 checksums, which all can be found in \texttt{java.util.zip}, a Java standard package. The PNG fuzzer relies heavily on the correctness of those algorithms and therefore uses this library to ensure accurate outputs instead of implementing the algorithms itself.
+\subsection{Process}
+To successfully write a PNG fuzzer and test the library, a generator and driver class need to be implemented. The generator is a self-contained class, which is called by JQF and returns a data type. In our case, the generator returns the data type \texttt{PngData}, which contains a byte array that resembles a functional PNG file. Next, the fuzz driver receives the \texttt{PngData}, which in return is read by PNGJ. The fuzz driver itself can be designed flexibly to test multiple functionalities in a library. This process is automatically repeated many times; each time JQF randomizes the seed to guide the random outputs from the generator in a more beneficial direction.
+\section{Generator}
+% TODO: Generator: Beschreibt im Detail die Implementation eures Generators. Begründet dabei Design-Entscheidungen sowie von euch verwendete Heuristiken.
+\subsection{Chunk Structure}
+This section will outline the structure of chunks, an important aspect of PNG files. The byte stream of PNG images can be broken down into chunks, where each one contains certain information and serves a concrete purpose. A chunk is marked by its uniform structure found in the header and trailer surrounding its content.
+\begin{table}
+    \caption{Byte strucure of a chunk.~\cite{libpng_file_structure}}
+    \label{tab1}
+    \begin{center}
+        \begin{tabular}{|c|c|c|c|}
+            \hline 
+            \rule{0pt}{3ex}
+            \textbf{ Chunk length } & \textbf{ Chunk type } & \textbf{   Chunk data   } & \textbf{   CRC   } \\ [0.5ex] 
+            \hline \hline
+            \rule{0pt}{3ex} 
+            4 bytes               & 4 bytes             & \textit{Length} bytes        & \ \ 4 bytes \ \     \\ [0.5ex] 
+            \hline
+        \end{tabular}              
+    \end{center}
+\end{table}
+
+As shown in table~\ref{tab1}, each chunk consists of 4 parts~\cite{libpng_file_structure}. 
+The \textit{Chunk length} refers to a 4-byte unsigned integer giving the number of bytes in the content field of that chunk, it doesn't include the length of the chunk type or the CRC checksum at the end.
+The \textit{Chunk type} is always represented by 4 characters each 1 byte long to uniquely identify each type of chunk. It uses capitalization to imply information about the chunk.
+The \textit{Chunk content} is the main part of each chunk and contains various amounts of data.
+The \textit{CRC} is a well-known checksum algorithm, which uses 32 bits and therefore is also called CRC32 here.
+
+We encapsulated this common structure in the class called \texttt{ChunkBuilder}. After generating the contents of a chunk, we simply call: 
+\begin{center}
+\texttt{ChunkBuilder.constructChunk(chunkType, chunkContent)} 
+\end{center}
+with the according type and content as byte arrays/streams and receive a complete chunk, which then can be concatenated with other chunks to form a PNG file. 
+
+\subsection{PNG Structure}
+Next, the ordering of chunks will be explained here.
+\subsubsection{Parameters}
+To decide which chunks should appear, each chunk refers to a parameter which is initialized in \texttt{initializeParameters}
+\subsubsection{Chunks}
+Here will all implemented chunks be represented with a short categorization of use.
+\subsection{IHDR}
+A short explanation what the IHDR chunk does and why it is so important for fuzzing.
+\subsubsection{Image Information}
+Also, there are parameters to store important information about the image itself, like the bit-depth, coloring, image size, compression and filter methods. 
+\subsection{IDAT}
+A short explanation with focus on the compression method.
+\subsubsection{Image Data}
+The uncompressed image data will be explained here with the focus on scanlines and filter bytes.
+\subsubsection{Filtering}
+Filtering is explained, the reason and implementation.
+\subsection{Interlacing}
+What is interlacing and how is it implemented?
+\subsection{Optional Chunks}
+Short explanation how the rest of the generator looks like and the reason why we are not going into detail much further.
+\section{Fuzz Driver}
 TODO: Fuzz Driver: Beschreibt grob, wie ihr bei der Implementation der Test-Treibers vorgegangen seid und welche Funktionalitäten der Library mit eurem Treiber getestet werden.
 \subsection{Guidance}
 TODO: Guidance: Beschreibt eure Änderungen an der Suchstrategie von JQF. Geht dabei insbesondere auf die Motivation/Intuition eurer Ideen ein, d.h. weshalb ihr diese Änderungen für sinnvoll haltet.
@@ -78,24 +136,13 @@ TODO: Versucht die Ergebnisse der Experimente zu interpretieren und zu erklären
 % \bibliography{mybibliography}
 %
 \begin{thebibliography}{8}
-\bibitem{ref_article1}
-Author, F.: Article title. Journal \textbf{2}(5), 99--110 (2016)
+\bibitem{JQF_paper}
+Rohan Padhye, Caroline Lemieux, and Koushik Sen. 2019. JQF: Coverage-Guided Property-Based Testing in Java. In Proceedings of the 28th ACM SIGSOFT International Symposium on Software Testing and Analysis (ISSTA ’19), July 15–19, 2019, Beijing, China. ACM, New York, NY, USA, 4 pages. \url{https://doi.org/10.1145/3293882.3339002}
+\bibitem{PNGJ_github}
+PNGJ GitHub-Page, \url{https://github.com/leonbloy/pngj?tab=readme-ov-file}
+\bibitem{libpng_file_structure}
+LibPng, PNG specification for file structure,
 
-\bibitem{ref_lncs1}
-Author, F., Author, S.: Title of a proceedings paper. In: Editor,
-F., Editor, S. (eds.) CONFERENCE 2016, LNCS, vol. 9999, pp. 1--13.
-Springer, Heidelberg (2016). \doi{10.10007/1234567890}
-
-\bibitem{ref_book1}
-Author, F., Author, S., Author, T.: Book title. 2nd edn. Publisher,
-Location (1999)
-
-\bibitem{ref_proc1}
-Author, A.-B.: Contribution title. In: 9th International Proceedings
-on Proceedings, pp. 1--2. Publisher, Location (2010)
-
-\bibitem{ref_url1}
-LNCS Homepage, \url{http://www.springer.com/lncs}. Last accessed 4
-Oct 2017
+\url{http://www.libpng.org/pub/png/spec/1.2/PNG-Structure.html}
 \end{thebibliography}
 \end{document}
