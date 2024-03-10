@@ -48,64 +48,66 @@ TODO: Input Specification: Beschreibt im Detail die Spezifikation des Dateiforma
 TODO: Security: Beschreibt mögliche Sicherheitslücken im Zusammenhang mit dem Datenformat. Geht dabei näher auf bereits existierende Fälle ein (case study), ggf. auch im Zusammenhang mit den von euch ausgewählten Tools (Bug-Tracker).
 
 \section{Implementation}
-\textbf{Noch nicht fertig!} \textit{Die Beschreibung der Implementation, des Generators und des Treibers sind im Prinzip fertig, enthalten jedoch noch einige komische Sätze. Man muss es nochmal gründlich durchlesen, anpassen und vor allem alle nötigen Quellen ergänzen.}
 \subsection{Tools}
 \subsubsection{JQF}
-The coverage-guided testing platform for Java named JQF, developed by R. Padhye, C. Lemieux and K. Sen, is designed for \textit{practitioners}, who want to find bugs in Java programs, as well as for \textit{researchers}, who wish to implement new fuzzing algorithms~\cite{JQF_paper}. For our project, we used JQF to implement a fuzzing generator based on the file format PNG, which can be directly used in JQF to run test drivers for matching libraries.
+The coverage-guided testing platform for Java named JQF, developed by R. Padhye, C. Lemieux and K. Sen, is designed for \textit{practitioners}, who want to find bugs in Java programs, as well as for \textit{researchers}, who wish to implement new fuzzing algorithms~\cite{JQF_paper}. As for our project, we used JQF to implement a fuzzing generator based on the file format PNG, which is tested by a driver directly in JQF.
 \subsubsection{PNGJ}
-As for the library to test, we chose PNGJ, which is a pure, open-source Java library for high-performance reading and writing of PNG images~\cite{PNGJ_github}. For our use case, mainly the reading capability of PNGJ was tested by the fuzzer.
+To test our fuzzer we chose PNGJ, which is a pure, open-source Java library for high-performance reading and writing of PNG images~\cite{PNGJ_github}. Especially the reading capability of PNGJ was tested by the fuzzer.
 \subsubsection{Java Standard Library}
-A large component of writing PNG files are the compression algorithms, CRC32 checksums and Adler32 checksums, which all can be found in \texttt{java.util.zip}, a Java standard package. The PNG fuzzer relies heavily on the correctness of those algorithms and therefore uses this library to ensure accurate outputs instead of implementing the algorithms itself.
+PNG files use compression algorithms~\cite{rfc_deflate_compression} as well as multiple checksum algorithms, which are all provided by the Java standard package \texttt{java.util.zip}~\cite{java_util_zip_docs}. The fuzzer is dependent on the correctness of those algorithms and therefore uses this library to ensure reliable results instead of implementing the algorithms itself.
 \subsection{Process}
-To successfully write a PNG fuzzer and test the library, a generator and driver class need to be implemented. The generator is a self-contained class, which is called by JQF and returns a data type. In our case, the generator returns the data type \texttt{PngData}, which contains a byte array that resembles a functional PNG file. Next, the fuzz driver receives the \texttt{PngData}, which in return is read by PNGJ. The fuzz driver itself can be designed flexibly to test multiple functionalities in a library. This process is automatically repeated many times; each time JQF randomizes the seed to guide the random outputs from the generator in a more beneficial direction.
+To implement the PNG fuzzer and test the library, a generator and driver class needed to be written. The generator is a self-contained class, which is called by JQF and returns a specified data type. In our case, the generator returns \texttt{PngData}, which wraps a byte array of a functional PNG file. Next, the fuzz driver receives the \texttt{PngData}, which in turn is processed by PNGJ. The fuzz driver itself can be designed flexibly to test multiple functionalities in a library. This process is automatically repeated; each time JQF uses the guidance algorithm Zest~\cite{zest_guidance} to guide the randomized seeds from the generator in a more beneficial direction.
 \section{Generator}
 % TODO: Generator: Beschreibt im Detail die Implementation eures Generators. Begründet dabei Design-Entscheidungen sowie von euch verwendete Heuristiken.
 \subsection{Chunk Structure}
 \label{chunk_structure}
-This section will outline the structure of chunks, an important aspect of PNG files. The byte stream of PNG images can be broken down into chunks, where each one contains certain information and serves a concrete purpose. A chunk is marked by its uniform structure found in the header and trailer surrounding its content.
-\begin{table}
-    \caption{Byte strucure of a chunk~\cite{libpng_file_structure}.}
-    \label{tab1}
-    \begin{center}
-        \begin{tabular}{|c|c|c|c|}
-            \hline 
-            \rule{0pt}{3ex}
-            \textbf{ Chunk length } & \textbf{ Chunk type } & \textbf{   Chunk data   } & \textbf{   CRC   } \\ [0.5ex] 
-            \hline \hline
-            \rule{0pt}{3ex} 
-            4 bytes               & 4 bytes             & \textit{Length} bytes        & \ \ 4 bytes \ \     \\ [0.5ex] 
-            \hline
-        \end{tabular}              
-    \end{center}
-\end{table}
+The byte stream of PNG images can be broken down into chunks, where each one contains certain information and serves a concrete purpose~\cite{libpng_chunks}. A chunk is marked by its uniform structure found in the header and trailer surrounding its content.
+\bgroup
+\def\arraystretch{1.5}
+\setlength\tabcolsep{1.5ex}
+    \begin{table}
+        \caption{Byte strucure of a chunk~\cite{libpng_file_structure}.}
+        \label{tab1}
+        \begin{center}
+            \begin{tabular}{|c|c|c|c|}
+                \hline 
+                \textbf{Chunk length} & \textbf{Chunk type} & \textbf{Chunk data} & \textbf{CRC} \\
+                \hline \hline
+                4 bytes               & 4 bytes             & \textit{Length} bytes        & 4 bytes \\
+                \hline
+            \end{tabular}              
+        \end{center}
+    \end{table}
+\egroup
 
 As shown in table~\ref{tab1}, each chunk consists of 4 parts~\cite{libpng_file_structure}. 
-The \textit{Chunk length} refers to a 4-byte unsigned integer giving the number of bytes in the content field of that chunk, it doesn't include the length of the chunk type nor the CRC checksum at the end.
-The \textit{Chunk type} is always represented by 4 characters each 1 byte long to uniquely identify each type of chunk. It uses capitalization to imply information about the chunk.
-The \textit{Chunk content} is the main part of each chunk and contains various amounts of data.
-The \textit{CRC} is a well-known checksum algorithm, which uses 32 bits and therefore is also called CRC32 here.
+The \textit{chunk length} refers to a 4-byte unsigned integer giving the number of bytes in the content field of that chunk, it doesn't include the length of the chunk type nor the CRC checksum at the end.
+The \textit{chunk type} is always represented by 4 characters each 1 byte long to uniquely identify each type of chunk. It uses capitalization to imply information about the chunk.
+The \textit{chunk content} is the main part of each chunk and contains various amounts of data.
+The \textit{CRC32} is a well-known checksum algorithm, which uses 32 bits. It includes the chunk type and content but not the length field.
 
 We encapsulated this common structure in the class called \texttt{ChunkBuilder}. After generating the contents of a chunk, we simply call: 
 \begin{center}
 \texttt{ChunkBuilder.constructChunk(chunkType, chunkContent)} 
 \end{center}
-with the according type and content as byte arrays/streams and receive a complete chunk, which then can be concatenated with other chunks to form a PNG file. 
+with the according type and content as byte arrays or streams and receive a complete chunk, which then is concatenated with other chunks to form a PNG file. 
 
 \subsection{PNG Structure}
-Chunks follow ordering constraints to form PNG files, they mainly revolve around 4 critical chunks (critical means that the chunk must appear). 
-Every PNG file begins with a fixed 8-byte signature and the \texttt{IHDR} chunk, which always must be first. The \texttt{IHDR} stores important image information which are commonly accessed by the following chunks.
+Chunks follow ordering constraints to form PNG files. There are 4 critical chunks (critical means that the chunk must appear), which determine the ordering of optional chunks. 
+
+Every PNG file must begin with a fixed 8-byte signature and the first chunk named \texttt{IHDR}. The \texttt{IHDR} stores important image information which are commonly accessed by its following chunks.
 The end of each PNG file is marked by the \texttt{IEND} chunk, which has no content but still a chunk header and trailer as mentioned in \ref{chunk_structure}.
 
-Between those chunks, the critical chunks \texttt{PLTE} and \texttt{IDAT} are found which hold information about the image data such as pixel color values as well as a color palette for indexed images. 
-All other (optional) chunks can be sorted into the space before \texttt{PLTE}, between \texttt{PLTE} and \texttt{IDAT} or after \texttt{IDAT}. 
+Between those chunks, the critical chunks \texttt{IDAT} and \texttt{PLTE} are found which hold information about the image data such as pixel color values as well as a color palette for indexed images. 
+Further optional chunks are sorted into the space before \texttt{PLTE}, between \texttt{PLTE} and \texttt{IDAT} or after \texttt{IDAT}. 
 For the exact ordering constraints, please refer to the PNG specifications~\cite{libpng_chunks}.
 \subsubsection{Parameters}
-The generator needs to keep track of which chunk is generated and then order them correctly. For that case, every chunk uses a boolean flag to indicate if it is used or not, which is randomly enabled in \texttt{initializeParameters()}.
+The generator needs to keep track of which chunk is generated and then order them correctly. For that case, every chunk uses a boolean flag to indicate if it is used or not, which is enabled in \texttt{initializeParameters()}.
 
 Furthermore, the generator stores parameters about information that is shared between chunks, for example, the bit-depth, the color type and the image size. 
 Before each run, the generator resets its parameters with \texttt{resetParameters()}.
 \subsubsection{Optional Chunks}
-In this section, a short overview will be explained to show which optional chunks~\cite{libpng_chunks} our generator can generate.
+In this section, a short overview will be given to explain which optional chunks~\cite{libpng_chunks} our generator can generate.
 
 \paragraph{Color Space Information}
 \texttt{cHRM}, \texttt{gAMA}, \texttt{iCCP}, \texttt{sBIT}, \texttt{sRGB} are chunks that are used to specify color space information, they define how the image is supposed to be displayed. They must appear before the \texttt{PLTE} chunk.
@@ -120,29 +122,18 @@ In this section, a short overview will be explained to show which optional chunk
 \texttt{tIME}, \texttt{iTXt}, \texttt{tEXt}, \texttt{zTXt} are chunks to hold textual information about the image such as the time the image was last modified or information about the title, author and more. They don't have any ordering constraints.
 
 \subsection{IHDR}
-The \texttt{IHDR} chunk, short for image header, stores critical information about the image and defines what type of image the fuzzer generates.
-It includes the \textit{image width}, \textit{image height}, \textit{bit-depth} (also called \textit{bits per channel}), \textit{color type}, \textit{compression method}, \textit{filter method} and \textit{interlace boolean}.
-Our generator randomizes most of these parameters.
+The \texttt{IHDR} chunk, short for image header, stores critical information about the image and determines what type of image the fuzzer generates.
+It includes the \textit{image width}, \textit{image height}, \textit{bit-depth} (also called \textit{bits per channel}), \textit{color type}, \textit{compression method}, \textit{filter method} and an \textit{interlace boolean}.
+The generator randomizes these parameters, except for the compression method and filter method: At present, only method 0 is defined for both in the \texttt{IHDR} chunk~\cite{libpng_chunks}. The generator still uses different compression methods as well as filter methods, but they are instead defined in their respective chunks.
 
 \subsubsection{Image Size}
-The \textit{image width} and \textit{height} can take on values between 1 and 10 pixels each, going larger than 10 pixels didn't seem to affect the number of covered branches. 
+The randomized \textit{image width} and \textit{image height} can take on values between 1 and 10 pixels each, going larger than 10 pixels didn't seem to affect the number of covered branches. 
 The size of up to 8 pixels contributes to the behaviour of interlacing (See section \ref{interlacing}), thus greatly increasing the coverage.
 
 \subsubsection{Bit-depth}
-The \textit{bit-depth} defines the number of bits per channel, whereas each channel represents one color value of a pixel, for example, the red channel with 1 byte in an RGB image would have a bit-depth of 8.
-The \textit{bit-depth} is directly dependent on the color type and only certain values are allowed to be used (See table \ref{tab2}).
+The \textit{bit-depth} defines the number of bits per channel. A channel refers to a single color value or alpha value.
+The bit-depth is directly dependent on the color type and only certain values are allowed to be used (See table \ref{tab2}).
 
-\subsubsection{Color Types}
-The \textit{color type} represents the structure of pixels in a PNG image. Grayscale images (color type 0) consist of 1 channel per pixel, RGB images (color type 2) have 3 channels for red, green and blue. 
-Both of these color types can include an alpha channel, which in turn makes them grayscale with alpha (color type 4) or RGBA (color type 6).
-
-An important aspect of PNGs is indexed images (color type 3), which use a palette to decrease the memory space needed.
-Instead of assigning each pixel multiple values for their respective channels (for example 3-bytes for an RGB image with a bit-depth of 8), indexed pixels only have 1 channel with the size of the bit-depth and store an index to the palette.
-The palette stores up to 256 entries (dependent on the bit-depth), each a 3 byte series of values representing red, green and blue. The main advantage comes from an image having the same colored pixel multiple times, which doesn't need to be stored separately in indexed images.
-
-The generator first selects a random color type, then randomly chooses one of the allowed bit-depths and stores both information as parameters.
-Furthermore, the number of channels is defined based on the color type. The flags of certain chunks are enabled, some optional chunks are enabled by chance, whereas chunks like the palette are mandatory for indexed images.
-An example of an optional chunk would be the \texttt{tRNS} one, which adds corresponding alpha values for entries in the palette.
 \bgroup
 \def\arraystretch{1.5}
 \setlength\tabcolsep{1.5ex}
@@ -162,17 +153,28 @@ An example of an optional chunk would be the \texttt{tRNS} one, which adds corre
         \end{center}
     \end{table}
 \egroup
-%Also, there are parameters to store important information about the image itself, like the bit-depth, coloring, image size, compression and filter methods. 
-%Explanation of how random color types are chosen, what constraints need be considered. Also explanation of indexed images in relation to, what chunks must appear if indexed.
-\subsection{IDAT}
-The \texttt{IDAT} chunk is used to store the pixel data of an image, which is first filtered and then compressed~\cite{libpng_chunks} by a \textit{deflate compression}, which is a derivative of the \textit{LZ77 compression} used in zip, gzip, pkzip and related programs~\cite{libpng_deflate}.
 
-The generator uses the standard library \texttt{java.util.zip} which already implements the exact compression algorithm used for PNG files. It also includes a special checksum, named \textit{Adler32}, which appends to the compressed data.
+\subsubsection{Color Types}
+The \textit{color type} determines the number channels per pixels and the structure how they are stored. Grayscale images (color type 0) consist of 1 channel per pixel, RGB images (color type 2) have 3 channels for red, green and blue. 
+Both of these color types can include an alpha channel, which in turn makes them grayscale with alpha (color type 4) or RGBA (color type 6)~\cite{libpng_data_representation}.
+
+Indexed images (color type 3) are used to decrease memory space and feature a palette in the \texttt{PLTE} chunk.
+Instead of assigning each pixel multiple values for their respective channels (for example 3-bytes for an RGB image with a bit-depth of 8), indexed pixels only have 1 channel with the size of the bit-depth and hold an index to the palette.
+The palette stores up to 256 entries (dependent on the bit-depth), each a 3 byte series of values representing red, green and blue. The main advantage comes from an image having the same colored pixel multiple times, which doesn't need to be stored separately in indexed images.
+
+As for the exact implementation, the generator first selects a random color type, then randomly chooses one of the allowed bit-depths and stores both information as parameters.
+Furthermore, the number of channels is determined based on the color type. The flags of certain chunks are enabled, some optional chunks are enabled by chance, whereas chunks like the palette are mandatory for indexed images.
+An example of an optional chunk would be the \texttt{tRNS} one, which adds corresponding alpha values for entries in the palette.
+
+\subsection{IDAT}
+The \texttt{IDAT} chunk is used to store the pixel data of an image, which is first filtered and then compressed~\cite{libpng_chunks} by a \textit{deflate compression}~\cite{rfc_deflate_compression}, which is a derivative of the \textit{LZ77 compression} used in \texttt{zip}, \texttt{gzip}, \texttt{pkzip} and related programs~\cite{libpng_deflate}.
+
+The generator uses the standard library \texttt{java.util.zip} which already implements the exact compression algorithm used for PNG files. It also includes an additional checksum, named \textit{Adler32}, which appends to the compressed data.
 \subsubsection{Image Data}
 The raw image data is a series of bytes which is divided into scanlines (rows) and pixels~\cite{libpng_data_representation}. 
-Each scanline starts with a so-called filter byte, which represents the filtering method used for that scanline.
+Each scanline starts with a filter byte, which represents the filtering method used for that scanline.
 
-The generator calculates the number of scanlines and pixels, based on the image width and height, and iterates over them.
+The generator calculates the number of scanlines and pixels based on the image width and height.
 After the filter byte, each scanline filters and appends pixels with randomized color channels accordingly.
 The size and number of channels are based on the color type and bit-depth.
 \subsubsection{Filtering}
@@ -186,19 +188,19 @@ The generator implements the filtering algorithms following the pseudo-code writ
 This allows large PNG files to be rendered smoothly instead of waiting for the complete image to be rendered at once.
 Interlacing is done by including multiple \texttt{IDAT} chunks in the PNG file, each one representing one pass of the rendering procedure.
 The first \texttt{IDAT} chunk only contains 1/64 of the pixels, the next one contains 1/32, then 1/16 and so on. The final, seventh pass contains the complete image.
-Which pixels are included is based on an 8-by-8-map of pixels which can be found in the specification~\cite{libpng_data_representation}.
+Which pixels are included is based on an 8-by-8-map of pixels~\cite{libpng_data_representation}.
 
-The generator implements interlacing by generating multiple \texttt{IDAT} chunks with a lower image width and height, this doesn't represent true interlacing since each pass uses randomized pixels but it doesn't hinder most PNG readers, rendering the image regardless.
+The generator implements interlacing by generating multiple \texttt{IDAT} chunks with a lower image width and height, this doesn't represent true interlacing since each pass uses randomized pixels but it doesn't hinder most PNG readers, rendering the image regardless and covering branches.
 \subsection{Other Chunks}
-All of the critical chunks have been explained to this point but the generator also implements a lot of optional chunks. 
-We are not going into much detail further because almost all optional chunks are just a way to store additional information about PNG images.
-That's why the actual implementation mostly fills optional chunks with random bytes adjusted to the size and constraints found for that specific chunk~\cite{libpng_chunks}.
+All of the critical chunks have been explained to this point but the generator also implements optional chunks. 
+This section will not provide more information about the exact implementation of the rest, because optional are primarily used to store additional information in an image.
+This is easily implemented by filling those chunks with random bytes, adhering to the size and structural constraints as specifeid~\cite{libpng_chunks}.
 \section{Fuzz Testing}
 \subsection{Fuzz Driver}
 As for the fuzz driver, we decided to use code samples, provided directly by \textit{PNGJ} itself~\cite{PNGJ_samples}, and combine them to test multiple functionalities.
-The largest contribution to the covered branches came by simply reading the PNG data, this covers all chunks superficially.
+The largest contribution to the covered branches came by simply reading the PNG data, this covers all chunks, albeit superficially.
 To test for detailed aspects of the library we also included a pipeline that changes the PNG image depending on its color type and rereads the data in every step.
-The reason why we decided to make the driver partially dependent on the color type is that most functionalities are only applicable to certain color types.
+The reason why we decided to make the driver dependent on the color type is that most functionalities are only applicable to certain color types, generating more valid inputs.
 
 In the first step, the fuzz driver checks for indexed images that use a palette and converts them to true color images that use RGB or RGBA. 
 In the second step, all converted images and images that were generated with true color by default are desaturated and converted to grayscale.
@@ -208,13 +210,13 @@ Although this approach tests multiple functionalities, it is still far from cove
 It would need a very detailed fuzz driver to cover everything, which would pose its own challenge and lie outside the scope of this project.
 
 \subsection{Guidance}
-JQF also offers the possibility to alter its guidance properties, this is a useful aspect of fuzzing, we decided to not use it though and stick to the default guidance settings.
+JQF also offers the possibility to alter its guidance properties, this is a useful aspect of fuzzing. However, we decided to not use it and stick to the default guidance settings.
 
-PNGs are a very interesting data format when it comes to fuzzing. The general idea of fuzzing is to generate random data that tries to cover most of the functionality of a program.
-However, the precise specifications of PNG files make this quite difficult. 
-Due to many checksums, compression algorithms and concrete identifiers, PNGs are difficult to come across purely randomly.
-Practically every byte must be at its exact location with its exact value.
-The precise nature of PNGs may offer approaches like grammar fuzzing to be successful, whereas mutational fuzzing would pose a great challenge.
+PNG is a very interesting data format when it comes to fuzzing. The general idea of fuzzing is to generate random data that tries to cover most of the functionality of a program.
+In contrast, the precise specifications of PNG files make this a difficult task. 
+Due to many checksums, compression algorithms and concrete identifiers, PNGs are rare to come across purely randomly.
+Practically every byte must be at its exact location with its exact, intended value.
+The explicit nature of PNGs may offer approaches like grammar fuzzing to be successful, whereas mutational fuzzing would pose a great challenge.
 
 \section{Evaluation}
 TODO: Beschreibt die durchgeführten Experimente und deren Ergebnisse. Wie hoch war die erreichte Coverage? Konnten Bugs/Crashes gefunden werden? Wenn ja, welche?
@@ -239,12 +241,22 @@ TODO: Versucht die Ergebnisse der Experimente zu interpretieren und zu erklären
 \begin{thebibliography}{8}
 \bibitem{JQF_paper}
 Rohan Padhye, Caroline Lemieux, and Koushik Sen. 2019. JQF: Coverage-Guided Property-Based Testing in Java. In Proceedings of the 28th ACM SIGSOFT International Symposium on Software Testing and Analysis (ISSTA ’19), July 15–19, 2019, Beijing, China. ACM, New York, NY, USA, 4 pages. \url{https://doi.org/10.1145/3293882.3339002}
+\bibitem{zest_guidance}
+Rohan Padhye, Caroline Lemieux, Koushik Sen, Mike Papadakis, and Yves Le Traon. 2019. Semantic Fuzzing with Zest. In Proceedings of the 28th ACM SIGSOFT International Symposium on Software Testing and Analysis (ISSTA’19), July 15–19, 2019, Beijing, China. ACM, New York, NY, USA, 12 pages. \url{https://doi.org/10.1145/3293882.3330576}
 \bibitem{PNGJ_github}
 PNGJ GitHub-Page, \url{https://github.com/leonbloy/pngj?tab=readme-ov-file}
 \bibitem{PNGJ_samples}
 PNGJ Samples, 
 
 \url{https://github.com/leonbloy/pngj/tree/master/src/test/java/ar/com/hjg/pngj/samples}
+\bibitem{rfc_deflate_compression}
+RFC 1951, Deflate Compressed Data Format Specification,
+
+\url{https://datatracker.ietf.org/doc/html/rfc1951}
+\bibitem{java_util_zip_docs}
+Package \texttt{java.util.zip},
+
+\url{https://download.java.net/java/early\_access/valhalla/docs/api/java.base/java/util/zip/package-summary.html}
 \bibitem{libpng_file_structure}
 LibPng: File structure,
 
