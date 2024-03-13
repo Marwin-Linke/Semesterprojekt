@@ -6,8 +6,10 @@ import ar.com.hjg.pngj.chunks.PngChunkTextVar;
 import ar.com.hjg.pngj.chunks.PngChunkPLTE;
 import ar.com.hjg.pngj.chunks.PngChunkTRNS;
 import com.pholser.junit.quickcheck.From;
+import edu.berkeley.cs.jqf.examples.chunks.RandomChunksGenerator;
 import edu.berkeley.cs.jqf.fuzz.Fuzz;
 import edu.berkeley.cs.jqf.fuzz.JQF;
+import org.junit.Assume;
 import org.junit.runner.RunWith;
 import edu.berkeley.cs.jqf.examples.png.*;
 
@@ -41,6 +43,37 @@ public class PngTest {
         currentReader = readPng(currentData);
 
         currentReader.close();
+
+    }
+
+    @Fuzz
+    public void testRandomChunksPipeline(@From(RandomChunksGenerator.class) PngData byteInput) {
+
+        PngData currentData;
+        PngReader currentReader;
+
+        try {
+            currentReader = readPng(byteInput);
+
+            if(currentReader.imgInfo.indexed) { // Indexed => True Color
+                currentData = convertToTrueColor(currentReader);
+                currentReader = readPng(currentData);
+            }
+
+            if(currentReader.imgInfo.channels >= 3) { // True Color => Grayscale
+                currentData = desaturateColors(currentReader);
+                currentReader = readPng(currentData);
+                currentData = convertToGrayscale(currentReader);
+                currentReader = readPng(currentData);
+            }
+
+            currentData = mirrorPng(currentReader);
+            currentReader = readPng(currentData);
+
+            currentReader.close();
+
+        }
+        catch (Exception e) { Assume.assumeNoException(e); }
 
     }
 
@@ -95,7 +128,7 @@ public class PngTest {
 
     }
 
-    public PngData convertToGrayscale(PngReader pngr) {
+    public edu.berkeley.cs.jqf.examples.png.PngData convertToGrayscale(PngReader pngr) {
 
         ImageInfo grayscaleInfo = new ImageInfo(
                 pngr.imgInfo.cols,
@@ -121,10 +154,10 @@ public class PngTest {
         }
         pngr.end();
         pngw.end();
-        return new PngData(outputStream.toByteArray());
+        return new edu.berkeley.cs.jqf.examples.png.PngData(outputStream.toByteArray());
     }
 
-    public PngData mirrorPng(PngReader pngr) {
+    public edu.berkeley.cs.jqf.examples.png.PngData mirrorPng(PngReader pngr) {
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PngWriter pngw = new PngWriter(outputStream, pngr.imgInfo);
@@ -137,7 +170,7 @@ public class PngTest {
         pngr.end();
         pngw.end();
 
-        return new PngData(outputStream.toByteArray());
+        return new edu.berkeley.cs.jqf.examples.png.PngData(outputStream.toByteArray());
     }
 
     private static void mirrorLineInt(ImageInfo imgInfo, int[] line) { // unpacked line
@@ -151,7 +184,7 @@ public class PngTest {
         }
     }
 
-    private PngReader readPng (PngData pngData) {
+    private PngReader readPng (edu.berkeley.cs.jqf.examples.png.PngData pngData) {
 
         InputStream stream = new ByteArrayInputStream(pngData.data);
         PngReader pngr = new PngReader(stream);
@@ -171,7 +204,7 @@ public class PngTest {
         return bytes;
     }
 
-    public static void createPngFile (PngData pngData, String fileName) {
+    public static void createPngFile (edu.berkeley.cs.jqf.examples.png.PngData pngData, String fileName) {
 
         try {
 
