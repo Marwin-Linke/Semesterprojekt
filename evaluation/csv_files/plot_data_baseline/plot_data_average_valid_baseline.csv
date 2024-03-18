@@ -1,4 +1,4 @@
-,all_covered_probes_x,passed_seconds,all_covered_probes_y,all_covered_probes_x,all_covered_probes_y,all_covered_probes_x,all_covered_probes_y,all_covered_probes_x,all_covered_probes_y,all_covered_probes_x,all_covered_probes_y,row_wise_mean,unix_time
+,valid_covered_probes_x,passed_seconds,valid_covered_probes_y,valid_covered_probes_x,valid_covered_probes_y,valid_covered_probes_x,valid_covered_probes_y,valid_covered_probes_x,valid_covered_probes_y,valid_covered_probes_x,valid_covered_probes_y,row_wise_mean,unix_time
 0,708,0,699.0,886.0,878.0,886.0,705.0,706.0,974.0,974.0,974.0,839.0,1707215626
 1,994,0,994.0,994.0,994.0,886.0,705.0,994.0,974.0,974.0,983.0,949.2,1707215626
 2,994,0,994.0,994.0,994.0,886.0,705.0,994.0,974.0,974.0,983.0,949.2,1707215626

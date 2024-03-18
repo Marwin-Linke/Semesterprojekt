@@ -5,6 +5,7 @@
 \documentclass[runningheads]{llncs}
 %
 \usepackage{graphicx}
+\usepackage{caption}
 % Used for displaying a sample figure. If possible, figure files should
 % be included in EPS format.
 %
@@ -219,15 +220,61 @@ Practically every byte must be at its exact location with its exact, intended va
 The explicit nature of PNGs may offer approaches like grammar fuzzing to be successful, whereas mutational fuzzing would pose a great challenge.
 
 \section{Evaluation}
+\iffalse
 TODO: Beschreibt die durchgeführten Experimente und deren Ergebnisse. Wie hoch war die erreichte Coverage? Konnten Bugs/Crashes gefunden werden? Wenn ja, welche?
+\fi
 \subsection{Experiments}
+To evaluate the efficiency of our implementation, we fuzzed the \textit{PNGJ}-libary with the following four fuzzers using our fuzz driver.\newline
+Firstly, our \textbf{Complete Fuzzer}, which uses the full capability of our generator to correctly generate all critical and optional chunks as specified~\cite{libpng_chunks}.\newline
+Secondly, our \textbf{Random Fuzzer} as a baseline, which generates random chunks in which only the signatures and the CRC checksums of the chunks are calculated correctly.\newline
+Thirdly, our \textbf{Probable Fuzzer} a version of our random baseline that also generates a correct IHDR and a correct IDAT chunk. The structure of the PNG files is therefore correct at least in the cirtical chunks.\newline
+Fourthly, our \textbf{Simple Fuzzer} a simplified version of our Complete Fuzzer, which contains only IHDR, IDAT, PLTE and IEND chunks, all colour types, only bit-depth of 8, default compression, no interlacing and no filtering. This fuzzer therefore generates only correct PNG files.\newline
+We tested PNGJ with each fuzzer 10 times, with each repetition taking one hour. All experiments were executed on a Windows 10 system using a GTX 1060 6 GB GPU, a Intel i5 7600k CPU with 16 GB DDR4-3200 RAM. The experiments were run sequentially.
+
 \subsection{Results}
+We did not find any bugs or crashes during our tests, so we were only able to analyse the coverage of the fuzzers.\newline
+In the following diagrams, the blue graph always belongs to the Complete Fuzzer, the red graph to the Probable Fuzzer, the green graph to the Simple Fuzzer, and the black graph to the Random Fuzzer.
+\subsubsection{Total Coverage}
+\begin{center}
+\includegraphics[width=\textwidth]{img/complete_coverage}
+\captionof{figure}{Coverage for each repetition over time}\label{fig1}
+\end{center}
+\begin{center}
+\includegraphics[width=\textwidth]{img/boxplot_coverage}
+\captionof{figure}{Final Coverage}\label{fig2}
+\end{center}
+With our Complete Fuzzer, we managed to cover 1629 branches in every repetition. The Probable Fuzzer covered an average of 1112.9 branches. The Simple Fuzzer covered 994 Branches in every repitition. And the Random Fuzzer covered an average of 732,2 branches.\newline
+The number of covered branches for the Complete Fuzzer and the Simple Fuzzer did not change during the runs. This is why Figure 2 does not show any variance in the final coverage. The coverage of the Probable Fuzzer fluctuated slightly between 1110 and 1115 branches during the test runs. The coverage of the Random Fuzzer varied significantly more from 610 to 783 branches.\newline
+It can also be observed that the fuzzers find a lot of new branches in the first minute and that the coverage almost stops to increase after that.
+
+\subsubsection{Valid Coverage}
+\begin{center}
+\includegraphics[width=\textwidth]{img/valid_coverage}
+\captionof{figure}{Valid Coverage over time}\label{fig3}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{img/average_coverage}
+\captionof{figure}{Mean Coverage over time (dotted graphs are valid coverage)}\label{fig4}
+\end{center}
+The valid coverage of the Complete Fuzzer and the Simple Fuzzer is identical to their total coverage. The Probable Fuzzer covers between 1038 and 1061 valid branches. That is slightly less than its total coverage. The Random Fuzzer had no valid coverage in our tests.\newline
+We checked the statistical significance of the differences in coverage using Mann-Whitney U tests. However, it is already clear from the figures that there is no overlap between the measurements of the fuzzers and that the differences are therefore significant.
 
 \section{Result Discussion}
+\iffalse
 TODO: Versucht die Ergebnisse der Experimente zu interpretieren und zu erklären (discussion). Zieht Sie Folgerungen aus den Ergebnissen (conclusion). Beschreibt die nächsten Schritte, die durchgeführt werden müssten/könnten/sollten (future work).
+\fi
 \subsection{Discussion}
+As expected, the Complete Fuzzer provides the greatest coverage. As it contains many optional chunks and features, it can utilise many of PNGJ's functions. This becomes particularly clear when it is compared with the Simple Fuzzer, which covers a much smaller number of branches due to its limited options. The Probable Fuzzer has decent coverage for its relatively low implementation effort. However, due to the complexity of a PNG file, it is very unlikely to randomly generate one of the options that would enable even higher coverage. The same applies to the Random Fuzzer.\newline
+The fact that the fuzzers reach their maximum coverage after about a minute may be explained by the limited complexity of the PNGJ library as well as our test driver. The final coverage of the Probable and Random Fuzzers varies between runs, as sometimes options are found randomly that lead to more coverage and sometimes not. With the Complete and Simple Fuzzer, on the other hand, the structure is more strictly predefined, so it is more likely to generate all possible options, which seems to have happened during our runs.\newline
+When testing the Random Fuzzer, a Heap Error sometimes occurred which caused our fuzzing run to crash. We have not yet been able to find the cause of this error.\newline
+The valid coverage of the Complete Fuzzer and the Simple Fuzzer is identical to their total coverage, because these two Fuzzers only generate valid PNG-files. The valid coverage of the Probable Fuzzer is on average slightly below its total coverage, which should be due to the fact that this fuzzer can generate all critical chunks correctly. The random fuzzer has no valid coverage, as it is very unlikely to generate a correct PNG file at random.
+
 \subsection{Conclusion}
+Our generator creates valid PNG files that can contain all critical and optional chunks. This gives us significantly higher total and valid coverage on our fuzzing targets than simpler fuzzers. PNG is a relatively complex file format in which there are many dependencies between individual components. Therefore, a PNG generator needs a fairly fixed structure to generate valid files. Generating PNGs is thus not efficient with simple fuzzers that are largely based on chance.
+
 \subsection{Future Work}
+Our generator could be tested on other more complex fuzzing targets. In addition, the JQF guidance could be adapted to possibly deliver better results with our generator.
 
 %
 % ---- Bibliography ----
