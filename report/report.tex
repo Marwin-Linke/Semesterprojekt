@@ -6,6 +6,7 @@
 %
 \usepackage{graphicx}
 \usepackage{caption}
+\usepackage[dvipsnames]{xcolor}
 % Used for displaying a sample figure. If possible, figure files should
 % be included in EPS format.
 %
@@ -28,25 +29,135 @@
 \maketitle              % typeset the header of the contribution
 %
 \begin{abstract}
-The abstract should briefly summarize the contents of the paper in
-150--250 words.
+Fuzzing is a dynamic testing technique used to discover bugs and
+security issues in programmes and software systems. It is an essential
+technique of software testing and security assurance. There are different
+fuzzing strategies ranging from simple mutation-based techniques to more
+advanced generator-based techniques, but they all have in common that
+they operate by automatically injecting a lot of different data into a target
+program's inputs to uncover bugs, unforeseen behaviors, system failures or
+vulnerabilities.
 
-\keywords{First keyword  \and Second keyword \and Another keyword.}
+The paper aims to summarize programming of a generator-based PNG fuzzer
+in JQF, with the target library of our fuzzer being PNGJ. Firstly, the paper
+provides a brief overview of the concept of usage of PNG and its
+specifications, as well as the security of PNG files. Furthermore, an overview
+regarding used tools and the process, had been provided. The
+implementation of the PNG generator is shown in detail and an overview of
+the implementation of the fuzz driver has been provided. Finally, the paper
+provides evaluation and discussion of the results.
+Keywords: PNG, Fuzzer, JQF
+
+\keywords{PNG  \and Fuzzing \and JQF.}
 \end{abstract}
 %
 %
 %
 \section{Background on the File Format PNG}
 \subsection{Overview}
-TODO: Overview: Gebt einen kurzen Überblick über das ausgewählte Datenformat (Historie, Verwendungszweck,...)
+%TODO: Overview: Gebt einen kurzen Überblick über das ausgewählte Datenformat (Historie, Verwendungszweck,...)
+
 \subsubsection{History}
-\subsubsection{Use Case}
+The idea of PNG and its development started in January 1995 after the
+compression algorithm LZW, used in GIF (Graphics Interchange Format), was
+patented. Authors of GIF-supporting software had to pay to use it since
+December 1994. PNG stands for Portable Network Graphics and was designed to be better, smaller
+and more extensible than GIF. PNG is free and supposed to be the successor of
+GIF.
+
+On the 1st of October 1996, PNG spec 1.0 was approved as W3C
+Recommendation and on the 15th of January 1997, PNG spec 1.0 was released as
+Informational RFC 2083 (IETF)~\cite{PNG_specification}. In 2004, PNG was published as an ISO/IEC 15948
+standard.
+
+\subsubsection{Use Cases}
+PNG is a raster-graphics file format, which allows lossless data compression and
+supports RGB and RGBA colors, as well as grayscale images. At default PNG does not allow
+animated graphics and is mostly used on the Internet for transferring images and
+pictures, for example it is often used for icons and buttons on websites.
+Since PNG does not support other color spaces than RGB/RGBA, it is not used for
+professional-quality print graphics or professional photographs.
+
 \subsection{Input Specification}
-TODO: Input Specification: Beschreibt im Detail die Spezifikation des Dateiformats. Wie sind Dateien dieses Formats aufgebaut? Existiert eine formale Spezifikation? Wie ist eine Beispieldatei aufgebaut?
-\subsubsection{Specifications}
-\subsubsection{Structure}
+%TODO: Input Specification: Beschreibt im Detail die Spezifikation des Dateiformats. Wie sind Dateien dieses Formats aufgebaut? Existiert eine formale Spezifikation? Wie ist eine Beispieldatei aufgebaut?
+PNG is specified as an Informational RFC 2083 (IETF) and has a formal specification as
+an ISO/IEC 15948 standard.
+This section provides a brief overview of the structure of PNG, more details are in
+section \ref{generator} Generator. Based on the structure of PNG, its byte streams can be broken
+down into chunks. There are different types of chunks with different information in
+them~\cite{libpng_chunks}. 3 types of chunks are critical for every PNG: \texttt{IHDR}, \texttt{IDAT} and \texttt{IEND}, that means
+that they have to appear. There is another chunk that is critical for color type 3 called
+\texttt{PLTE}. Every PNG file starts with the 8-byte signature \texttt{89 50 4E 47 0D 0A 1A 0A};
+and each byte has its own purpose~\cite{libpng_rationale}.
+
+\subsubsection{Example}
+An example for a very small PNG image, displaying a single red pixel, is the following sequence of bytes:
+
+\begin{center}
+    \texttt{\color{NavyBlue}89 50 4E 47 0D 0A \color{PineGreen}1A 0A 00 00 00 0D 49 48 44 52 00 00 00 01 00 00 00 01 08 02
+00 00 00 90 77 53 \color{Violet}DE 00 00 00 0C 49 44 41 54 08 D7 63 F8 CF C0 0000 03 01 01 00
+18 DD 8D B0 \color{Plum}00 00 00 00 49 45 4E 44 AE 42 60 82}
+
+\texttt{\color{NavyBlue}PNG \color{PineGreen}IHDR \color{Violet}IDAT \color{Plum}IEND}
+\end{center}
+
+
+\paragraph{Signature}
+\begin{itemize}
+    \item \texttt{{\color{NavyBlue}89}} distinguishes PNG files on systems that expect the first two bytes to identify the file type uniquely.
+    \item \texttt{{\color{NavyBlue}50 4E 47}} stands for PNG in ASCII, so that if a person opens a PNG file in a text editor the first word is PNG.
+    \item \texttt{{\color{NavyBlue}0D 0A}} catches bad file transfers that alter newline sequences.
+    \item \texttt{{\color{NavyBlue}1A}} is a byte that stops the display of the file with DOS.
+    \item \texttt{{\color{NavyBlue}0A}} checks for the inverse of the CR-LF translation problem.
+
+\end{itemize}
+
+\paragraph{Image Header (\texttt{IHDR})}
+\begin{itemize}
+    \item \texttt{\color{PineGreen}00 00 00 0D} This chunk has 13 bytes of content.
+    \item \texttt{\color{PineGreen}49 48 44 52} This is an IHDR chunk (chunk type in ASCII).
+    \item \texttt{\color{PineGreen}00 00 00 01} The image is 1 pixel wide.
+    \item \texttt{\color{PineGreen}00 00 00 01} The image is 1 pixel high.
+    \item \texttt{\color{PineGreen}08} 8 bits are used per channel.
+    \item \texttt{\color{PineGreen}02} Color type 2 is used.
+    \item \texttt{\color{PineGreen}00} The compression method is 0.
+    \item \texttt{\color{PineGreen}00} The filter method is 0.
+    \item \texttt{\color{PineGreen}00} No interlacing is used.
+    \item \texttt{\color{PineGreen}90 77 53 DE} The CRC of the chunk's type and content.
+\end{itemize}
+
+\paragraph{Image Data (\texttt{IDAT})}
+
+\begin{itemize}
+    \item \texttt{\color{Violet}00 00 00 0C} This chunk has 12 bytes of content.
+    \item \texttt{\color{Violet}49 44 41 54} This is an IDAT chunk (chunk type in ASCII).
+    \item \texttt{\color{Violet}08} is a Deflate compression method using a 256-byte window.
+    \item \texttt{\color{Violet}D7} is a ZLIB FCHECK value, which indicates, that no dictionary and the maximum compression algorithm is used.
+    \item \texttt{\color{Violet}63 F8 CF C0 00 00} A compressed Deflate block using the static Huffman code (this sequence makes the pixel red).
+    \item \texttt{\color{Violet}03 01 01 00} is the ZLIB check value.
+    \item \texttt{\color{Violet}18 DD 8D B0} the CRC of the chunk's type and content.
+\end{itemize}
+
+
+\paragraph{Image End (\texttt{IEND})}
+\begin{itemize}
+    \item \texttt{\color{Plum}00 00 00 00} This chunk has 0 bytes of content.
+    \item \texttt{\color{Plum}49 45 4E 44} This is an IEND chunk (chunk type in ASCII).
+    \item \texttt{\color{Plum}AE 42 60 82} The CRC of the chunk's type and content.
+\end{itemize}
+
 \subsection{Security}
-TODO: Security: Beschreibt mögliche Sicherheitslücken im Zusammenhang mit dem Datenformat. Geht dabei näher auf bereits existierende Fälle ein (case study), ggf. auch im Zusammenhang mit den von euch ausgewählten Tools (Bug-Tracker).
+%TODO: Security: Beschreibt mögliche Sicherheitslücken im Zusammenhang mit dem Datenformat. Geht dabei näher auf bereits existierende Fälle ein (case study), ggf. auch im Zusammenhang mit den von euch ausgewählten Tools (Bug-Tracker).
+Over the previous years, several security issues had been detected with PNG files.
+Libpng is the official PNG reverence library and has a good documentation for fixed
+security vulnerabilities~\cite{security}. Currently, 47 vulnerabilities are known and fixed for Libpng.
+These vulnerabilities range from less important ones like an error message when
+opening a PNG to very serious ones, where attackers can execute arbitrary code. The
+most dangerous vulnerability is documented in CVE-2014-9495, as a Heap-based
+buffer overflow in the \texttt{png\_combine\_row} function in libpng before 1.5.21 and 1.6.x
+before 1.6.16. Where when running on 64-bit systems, might allow context-dependent attackers to execute arbitrary code via a "very wide interlaced" PNG
+image. That vulnerability basically allowed attackers to install malware on the device
+that opened the PNG.
 
 \section{Implementation}
 \subsection{Tools}
@@ -59,6 +170,7 @@ PNG files use compression algorithms~\cite{rfc_deflate_compression} as well as m
 \subsection{Process}
 To implement the PNG fuzzer and test the library, a generator and driver class needed to be written. The generator is a self-contained class, which is called by JQF and returns a specified data type. In our case, the generator returns \texttt{PngData}, which wraps a byte array of a functional PNG file. Next, the fuzz driver receives the \texttt{PngData}, which in turn is processed by PNGJ. The fuzz driver itself can be designed flexibly to test multiple functionalities in a library. This process is automatically repeated; each time JQF uses the guidance algorithm Zest~\cite{zest_guidance} to guide the randomized seeds from the generator in a more beneficial direction.
 \section{Generator}
+\label{generator}
 % TODO: Generator: Beschreibt im Detail die Implementation eures Generators. Begründet dabei Design-Entscheidungen sowie von euch verwendete Heuristiken.
 \subsection{Chunk Structure}
 \label{chunk_structure}
@@ -220,19 +332,25 @@ Practically every byte must be at its exact location with its exact, intended va
 The explicit nature of PNGs may offer approaches like grammar fuzzing to be successful, whereas mutational fuzzing would pose a great challenge.
 
 \section{Evaluation}
-\iffalse
-TODO: Beschreibt die durchgeführten Experimente und deren Ergebnisse. Wie hoch war die erreichte Coverage? Konnten Bugs/Crashes gefunden werden? Wenn ja, welche?
-\fi
+
+% TODO: Beschreibt die durchgeführten Experimente und deren Ergebnisse. Wie hoch war die erreichte Coverage? Konnten Bugs/Crashes gefunden werden? Wenn ja, welche?
+
 \subsection{Experiments}
-To evaluate the efficiency of our implementation, we fuzzed the \textit{PNGJ}-libary with the following four fuzzers using our fuzz driver.\newline
-Firstly, our \textbf{Complete Fuzzer}, which uses the full capability of our generator to correctly generate all critical and optional chunks as specified~\cite{libpng_chunks}.\newline
-Secondly, our \textbf{Random Fuzzer} as a baseline, which generates random chunks in which only the signatures and the CRC checksums of the chunks are calculated correctly.\newline
-Thirdly, our \textbf{Probable Fuzzer} a version of our random baseline that also generates a correct IHDR and a correct IDAT chunk. The structure of the PNG files is therefore correct at least in the cirtical chunks.\newline
-Fourthly, our \textbf{Simple Fuzzer} a simplified version of our Complete Fuzzer, which contains only IHDR, IDAT, PLTE and IEND chunks, all colour types, only bit-depth of 8, default compression, no interlacing and no filtering. This fuzzer therefore generates only correct PNG files.\newline
+To evaluate the efficiency of our implementation, we fuzzed the \textit{PNGJ}-libary with the following four fuzzers using our fuzz driver:
+\begin{itemize}
+    \item A \textbf{Complete Fuzzer}, which uses the full capability of our generator to correctly generate all critical and optional chunks as specified~\cite{libpng_chunks}.
+    \item A \textbf{Random Fuzzer} as a baseline, which generates random chunks in which only the chunk types and the CRC checksums of the chunks are calculated correctly.
+    \item A \textbf{Probable Fuzzer} a version of our random baseline that additionally generates a correct IHDR and a partially correct IDAT chunk. The structure of the PNG files is therefore correct at least in the cirtical chunks.
+    \item A \textbf{Simple Fuzzer} a simplified version of our Complete Fuzzer, which contains only IHDR, IDAT, PLTE and IEND chunks, all colour types, only bit-depth of 8, default compression, no interlacing and no filtering. This fuzzer therefore generates only correct PNG files.
+
+\end{itemize}
+Every fuzzer except the Simple Fuzzer is also able to generate optional chunks, albeit by chance.
+
 We tested PNGJ with each fuzzer 10 times, with each repetition taking one hour. All experiments were executed on a Windows 10 system using a GTX 1060 6 GB GPU, a Intel i5 7600k CPU with 16 GB DDR4-3200 RAM. The experiments were run sequentially.
 
 \subsection{Results}
-We did not find any bugs or crashes during our tests, so we were only able to analyse the coverage of the fuzzers.\newline
+We did not find any bugs or crashes during our tests, so we were only able to analyse the coverage of the fuzzers.
+
 In the following diagrams, the blue graph always belongs to the Complete Fuzzer, the red graph to the Probable Fuzzer, the green graph to the Simple Fuzzer, and the black graph to the Random Fuzzer.
 \subsubsection{Total Coverage}
 \begin{center}
@@ -243,9 +361,31 @@ In the following diagrams, the blue graph always belongs to the Complete Fuzzer,
 \includegraphics[width=\textwidth]{img/boxplot_coverage}
 \captionof{figure}{Final Coverage}\label{fig2}
 \end{center}
-With our Complete Fuzzer, we managed to cover 1629 branches in every repetition. The Probable Fuzzer covered an average of 1112.9 branches. The Simple Fuzzer covered 994 Branches in every repitition. And the Random Fuzzer covered an average of 732,2 branches.\newline
-The number of covered branches for the Complete Fuzzer and the Simple Fuzzer did not change during the runs. This is why Figure 2 does not show any variance in the final coverage. The coverage of the Probable Fuzzer fluctuated slightly between 1110 and 1115 branches during the test runs. The coverage of the Random Fuzzer varied significantly more from 610 to 783 branches.\newline
+
+With our Complete Fuzzer, we managed to cover 1629 branches in every repetition. The Probable Fuzzer covered an average of 1112.9 branches. The Simple Fuzzer covered 994 Branches in every repitition. And the Random Fuzzer covered an average of 732,2 branches.
+
+The number of covered branches for the Complete Fuzzer and the Simple Fuzzer did not change during the runs. This is why Figure 2 does not show any variance in the final coverage. The coverage of the Probable Fuzzer fluctuated slightly between 1110 and 1115 branches during the test runs. The coverage of the Random Fuzzer varied significantly more from 610 to 783 branches.
 It can also be observed that the fuzzers find a lot of new branches in the first minute and that the coverage almost stops to increase after that.
+
+\bgroup
+\def\arraystretch{1.5}
+\setlength\tabcolsep{1.5ex}
+\begin{table}[]
+    \caption{Coverage for each fuzzer.}
+    \label{tab3}
+    \begin{center}
+        \begin{tabular}{|l|l|l|}
+            \hline
+            \textbf{Fuzzer} & \textbf{Average coverage} & \textbf{Average valid coverage} \\ \hline \hline
+            Complete Fuzzer & 1629                      & 1629                            \\ \hline
+            Random Fuzzer   & 732.2                     & 0                               \\ \hline
+            Probable Fuzzer & 1112.9                    & 1053                            \\ \hline
+            Simple Fuzzer   & 994                       & 994                             \\ \hline
+        
+        \end{tabular}
+    \end{center}
+\end{table}
+\egroup
 
 \subsubsection{Valid Coverage}
 \begin{center}
@@ -257,17 +397,19 @@ It can also be observed that the fuzzers find a lot of new branches in the first
 \includegraphics[width=\textwidth]{img/average_coverage}
 \captionof{figure}{Mean Coverage over time (dotted graphs are valid coverage)}\label{fig4}
 \end{center}
-The valid coverage of the Complete Fuzzer and the Simple Fuzzer is identical to their total coverage. The Probable Fuzzer covers between 1038 and 1061 valid branches. That is slightly less than its total coverage. The Random Fuzzer had no valid coverage in our tests.\newline
+The valid coverage of the Complete Fuzzer and the Simple Fuzzer is identical to their total coverage. The Probable Fuzzer covers between 1038 and 1061 valid branches. That is slightly less than its total coverage. The Random Fuzzer had no valid coverage in our tests.
+
 We checked the statistical significance of the differences in coverage using Mann-Whitney U tests. However, it is already clear from the figures that there is no overlap between the measurements of the fuzzers and that the differences are therefore significant.
 
 \section{Result Discussion}
-\iffalse
-TODO: Versucht die Ergebnisse der Experimente zu interpretieren und zu erklären (discussion). Zieht Sie Folgerungen aus den Ergebnissen (conclusion). Beschreibt die nächsten Schritte, die durchgeführt werden müssten/könnten/sollten (future work).
-\fi
+%TODO: Versucht die Ergebnisse der Experimente zu interpretieren und zu erklären (discussion). Zieht Sie Folgerungen aus den Ergebnissen (conclusion). Beschreibt die nächsten Schritte, die durchgeführt werden müssten/könnten/sollten (future work).
 \subsection{Discussion}
-As expected, the Complete Fuzzer provides the greatest coverage. As it contains many optional chunks and features, it can utilise many of PNGJ's functions. This becomes particularly clear when it is compared with the Simple Fuzzer, which covers a much smaller number of branches due to its limited options. The Probable Fuzzer has decent coverage for its relatively low implementation effort. However, due to the complexity of a PNG file, it is very unlikely to randomly generate one of the options that would enable even higher coverage. The same applies to the Random Fuzzer.\newline
-The fact that the fuzzers reach their maximum coverage after about a minute may be explained by the limited complexity of the PNGJ library as well as our test driver. The final coverage of the Probable and Random Fuzzers varies between runs, as sometimes options are found randomly that lead to more coverage and sometimes not. With the Complete and Simple Fuzzer, on the other hand, the structure is more strictly predefined, so it is more likely to generate all possible options, which seems to have happened during our runs.\newline
-When testing the Random Fuzzer, a Heap Error sometimes occurred which caused our fuzzing run to crash. We have not yet been able to find the cause of this error.\newline
+As expected, the Complete Fuzzer provides the greatest coverage. As it contains many optional chunks and features, it can utilise many of PNGJ's functions. This becomes particularly clear when it is compared with the Simple Fuzzer, which covers a much smaller number of branches due to its limited options. The Probable Fuzzer has decent coverage for its relatively low implementation effort. However, due to the complexity of a PNG file, it is very unlikely to randomly generate one of the options that would enable even higher coverage. The same applies to the Random Fuzzer.
+
+The fact that the fuzzers reach their maximum coverage after about a minute may be explained by the limited complexity of the PNGJ library as well as our test driver. The final coverage of the Probable and Random Fuzzers varies between runs, as sometimes options are found randomly that lead to more coverage and sometimes not. With the Complete and Simple Fuzzer, on the other hand, the structure is more strictly predefined, so it is more likely to generate all possible options, which seems to have happened during our runs.
+
+When testing the Random Fuzzer, a Heap Error sometimes occurred which caused our fuzzing run to crash. We have not yet been able to find the cause of this error.
+
 The valid coverage of the Complete Fuzzer and the Simple Fuzzer is identical to their total coverage, because these two Fuzzers only generate valid PNG-files. The valid coverage of the Probable Fuzzer is on average slightly below its total coverage, which should be due to the fact that this fuzzer can generate all critical chunks correctly. The random fuzzer has no valid coverage, as it is very unlikely to generate a correct PNG file at random.
 
 \subsection{Conclusion}
@@ -286,6 +428,15 @@ Our generator could be tested on other more complex fuzzing targets. In addition
 % \bibliography{mybibliography}
 %
 \begin{thebibliography}{8}
+\bibitem{PNG_specification}
+Thomas Boutell. 1997. RFC Editor, PNG (Portable Network Graphics) Specification Version 1.0
+\bibitem{security}
+Libpng, Security vulnerabilities, CVEs,
+
+\url{https://www.cvedetails.com/vulnerability-list/vendor\_id-7294/Libpng.html?page=1\&order=3\&trc=47\&sha=20a26d14531b8eff223b0769a2834502ea917ecf}
+\bibitem{libpng_rationale}
+Libpng, Rationale,
+\url{http://www.libpng.org/pub/png/spec/1.2/PNG-Rationale.html}
 \bibitem{JQF_paper}
 Rohan Padhye, Caroline Lemieux, and Koushik Sen. 2019. JQF: Coverage-Guided Property-Based Testing in Java. In Proceedings of the 28th ACM SIGSOFT International Symposium on Software Testing and Analysis (ISSTA ’19), July 15–19, 2019, Beijing, China. ACM, New York, NY, USA, 4 pages. \url{https://doi.org/10.1145/3293882.3339002}
 \bibitem{zest_guidance}
@@ -305,23 +456,23 @@ Package \texttt{java.util.zip},
 
 \url{https://download.java.net/java/early\_access/valhalla/docs/api/java.base/java/util/zip/package-summary.html}
 \bibitem{libpng_file_structure}
-LibPng: File structure,
+Libpng: File structure,
 
 \url{http://www.libpng.org/pub/png/spec/1.2/PNG-Structure.html}
 \bibitem{libpng_chunks}
-LibPng: Chunk specification, 
+Libpng: Chunk specification, 
 
 \url{http://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html}
 \bibitem{libpng_deflate}
-LibPng: Deflate algorithm,
+Libpng: Deflate algorithm,
 
 \url{http://www.libpng.org/pub/png/spec/1.2/PNG-Compression.html}
 \bibitem{libpng_filtering}
-LibPng: Filtering,
+Libpng: Filtering,
 
 \url{http://www.libpng.org/pub/png/spec/1.2/PNG-Filters.html}
 \bibitem{libpng_data_representation}
-LibPng: Data representation,
+Libpng: Data representation,
 
 \url{http://www.libpng.org/pub/png/spec/1.2/PNG-DataRep.html}
 \end{thebibliography}
