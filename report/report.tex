@@ -46,7 +46,6 @@ regarding used tools and the process, had been provided. The
 implementation of the PNG generator is shown in detail and an overview of
 the implementation of the fuzz driver has been provided. Finally, the paper
 provides evaluation and discussion of the results.
-Keywords: PNG, Fuzzer, JQF
 
 \keywords{PNG  \and Fuzzing \and JQF.}
 \end{abstract}
@@ -54,7 +53,7 @@ Keywords: PNG, Fuzzer, JQF
 %
 %
 \section{Background on the File Format PNG}
-\subsection{Overview}
+\subsection{Overview \normalfont\textit{(Sebastian Schatz)}}
 %TODO: Overview: Gebt einen kurzen Überblick über das ausgewählte Datenformat (Historie, Verwendungszweck,...)
 
 \subsubsection{History}
@@ -78,7 +77,7 @@ pictures, for example it is often used for icons and buttons on websites.
 Since PNG does not support other color spaces than RGB/RGBA, it is not used for
 professional-quality print graphics or professional photographs.
 
-\subsection{Input Specification}
+\subsection{Input Specification  \normalfont\textit{(Sebastian Schatz)}}
 %TODO: Input Specification: Beschreibt im Detail die Spezifikation des Dateiformats. Wie sind Dateien dieses Formats aufgebaut? Existiert eine formale Spezifikation? Wie ist eine Beispieldatei aufgebaut?
 PNG is specified as an Informational RFC 2083 (IETF) and has a formal specification as
 an ISO/IEC 15948 standard.
@@ -146,7 +145,7 @@ An example for a very small PNG image, displaying a single red pixel, is the fol
     \item \texttt{\color{Plum}AE 42 60 82} The CRC of the chunk's type and content.
 \end{itemize}
 
-\subsection{Security}
+\subsection{Security  \normalfont\textit{(Sebastian Schatz)}}
 %TODO: Security: Beschreibt mögliche Sicherheitslücken im Zusammenhang mit dem Datenformat. Geht dabei näher auf bereits existierende Fälle ein (case study), ggf. auch im Zusammenhang mit den von euch ausgewählten Tools (Bug-Tracker).
 Over the previous years, several security issues had been detected with PNG files.
 Libpng is the official PNG reverence library and has a good documentation for fixed
@@ -154,25 +153,25 @@ security vulnerabilities~\cite{security}. Currently, 47 vulnerabilities are know
 These vulnerabilities range from less important ones like an error message when
 opening a PNG to very serious ones, where attackers can execute arbitrary code. The
 most dangerous vulnerability is documented in CVE-2014-9495, as a Heap-based
-buffer overflow in the \texttt{png\_combine\_row} function in libpng before 1.5.21 and 1.6.x
+buffer overflow in the \texttt{png\_combine\_row} function in Libpng before 1.5.21 and 1.6.x
 before 1.6.16. Where when running on 64-bit systems, might allow context-dependent attackers to execute arbitrary code via a "very wide interlaced" PNG
 image. That vulnerability basically allowed attackers to install malware on the device
 that opened the PNG.
 
 \section{Implementation}
-\subsection{Tools}
+\subsection{Tools \normalfont\textit{(Marwin Linke)}}
 \subsubsection{JQF}
 The coverage-guided testing platform for Java named JQF, developed by R. Padhye, C. Lemieux and K. Sen, is designed for \textit{practitioners}, who want to find bugs in Java programs, as well as for \textit{researchers}, who wish to implement new fuzzing algorithms~\cite{JQF_paper}. As for our project, we used JQF to implement a fuzzing generator based on the file format PNG, which is tested by a driver directly in JQF.
 \subsubsection{PNGJ}
 To test our fuzzer we chose PNGJ, which is a pure, open-source Java library for high-performance reading and writing of PNG images~\cite{PNGJ_github}. Especially the reading capability of PNGJ was tested by the fuzzer.
 \subsubsection{Java Standard Library}
 PNG files use compression algorithms~\cite{rfc_deflate_compression} as well as multiple checksum algorithms, which are all provided by the Java standard package \texttt{java.util.zip}~\cite{java_util_zip_docs}. The fuzzer is dependent on the correctness of those algorithms and therefore uses this library to ensure reliable results instead of implementing the algorithms itself.
-\subsection{Process}
+\subsection{Process \normalfont\textit{(Marwin Linke)}}
 To implement the PNG fuzzer and test the library, a generator and driver class needed to be written. The generator is a self-contained class, which is called by JQF and returns a specified data type. In our case, the generator returns \texttt{PngData}, which wraps a byte array of a functional PNG file. Next, the fuzz driver receives the \texttt{PngData}, which in turn is processed by PNGJ. The fuzz driver itself can be designed flexibly to test multiple functionalities in a library. This process is automatically repeated; each time JQF uses the guidance algorithm Zest~\cite{zest_guidance} to guide the randomized seeds from the generator in a more beneficial direction.
 \section{Generator}
 \label{generator}
 % TODO: Generator: Beschreibt im Detail die Implementation eures Generators. Begründet dabei Design-Entscheidungen sowie von euch verwendete Heuristiken.
-\subsection{Chunk Structure}
+\subsection{Chunk Structure \normalfont\textit{(Sebastian Schatz, Paul Kalz, Marwin Linke)}}
 \label{chunk_structure}
 The byte stream of PNG images can be broken down into chunks, where each one contains certain information and serves a concrete purpose~\cite{libpng_chunks}. A chunk is marked by its uniform structure found in the header and trailer surrounding its content.
 \bgroup
@@ -205,7 +204,7 @@ We encapsulated this common structure in the class called \texttt{ChunkBuilder}.
 \end{center}
 with the according type and content as byte arrays or streams and receive a complete chunk, which then is concatenated with other chunks to form a PNG file. 
 
-\subsection{PNG Structure}
+\subsection{PNG Structure \normalfont\textit{(Sebastian Schatz, Paul Kalz, Marwin Linke)}}
 Chunks follow ordering constraints to form PNG files. There are 4 critical chunks (critical means that the chunk must appear), which determine the ordering of optional chunks. 
 
 Every PNG file must begin with a fixed 8-byte signature and the first chunk named \texttt{IHDR}. The \texttt{IHDR} stores important image information which are commonly accessed by its following chunks.
@@ -234,7 +233,7 @@ In this section, a short overview will be given to explain which optional chunks
 \paragraph{Textual Information}
 \texttt{tIME}, \texttt{iTXt}, \texttt{tEXt}, \texttt{zTXt} are chunks to hold textual information about the image such as the time the image was last modified or information about the title, author and more. They don't have any ordering constraints.
 
-\subsection{IHDR}
+\subsection{IHDR \normalfont\textit{(Sebastian Schatz, Paul Kalz, Marwin Linke)}}
 The \texttt{IHDR} chunk, short for image header, stores critical information about the image and determines what type of image the fuzzer generates.
 It includes the \textit{image width}, \textit{image height}, \textit{bit-depth} (also called \textit{bits per channel}), \textit{color type}, \textit{compression method}, \textit{filter method} and an \textit{interlace boolean}.
 The generator randomizes these parameters, except for the compression method and filter method: At present, only method 0 is defined for both in the \texttt{IHDR} chunk~\cite{libpng_chunks}. The generator still uses different compression methods as well as filter methods, but they are instead defined in their respective chunks.
@@ -279,7 +278,7 @@ As for the exact implementation, the generator first selects a random color type
 Furthermore, the number of channels is determined based on the color type. The flags of certain chunks are enabled, some optional chunks are enabled by chance, whereas chunks like the palette are mandatory for indexed images.
 An example of an optional chunk would be the \texttt{tRNS} one, which adds corresponding alpha values for entries in the palette.
 
-\subsection{IDAT}
+\subsection{IDAT \normalfont\textit{(Sebastian Schatz, Paul Kalz, Marwin Linke)}}
 The \texttt{IDAT} chunk is used to store the pixel data of an image, which is first filtered and then compressed~\cite{libpng_chunks} by a \textit{deflate compression}~\cite{rfc_deflate_compression}, which is a derivative of the \textit{LZ77 compression} used in \texttt{zip}, \texttt{gzip}, \texttt{pkzip} and related programs~\cite{libpng_deflate}.
 
 The generator uses the standard library \texttt{java.util.zip} which already implements the exact compression algorithm used for PNG files. It also includes an additional checksum, named \textit{Adler32}, which appends to the compressed data.
@@ -295,7 +294,7 @@ There are five different filtering methods, whereas an empty byte (0) represents
 Methods 1 to 4 indicate the use of \textit{Sub}, \textit{Up}, \textit{Average} or \textit{Paeth filtering}.
 The reason to use filtering is to represent the color values relative to their neighbouring pixels, this allows the deflate algorithm to compress patterns which are found relatively between pixels.
 The generator implements the filtering algorithms following the pseudo-code written in the specification~\cite{libpng_filtering}.
-\subsection{Interlacing}
+\subsection{Interlacing \normalfont\textit{(Sebastian Schatz, Paul Kalz, Marwin Linke)}}
 \label{interlacing}
 \textit{Interlacing} is a procedure to render an image over multiple passes. It starts with a low resolution and increases with each pass until the complete image is shown.
 This allows large PNG files to be rendered smoothly instead of waiting for the complete image to be rendered at once.
@@ -304,12 +303,12 @@ The first \texttt{IDAT} chunk only contains 1/64 of the pixels, the next one con
 Which pixels are included is based on an 8-by-8-map of pixels~\cite{libpng_data_representation}.
 
 The generator implements interlacing by generating multiple \texttt{IDAT} chunks with a lower image width and height, this doesn't represent true interlacing since each pass uses randomized pixels but it doesn't hinder most PNG readers, rendering the image regardless and covering branches.
-\subsection{Other Chunks}
+\subsection{Other Chunks \normalfont\textit{(Sebastian Schatz, Paul Kalz, Marwin Linke)}}
 All of the critical chunks have been explained to this point but the generator also implements optional chunks. 
 This section will not provide more information about the exact implementation of the rest, because optional are primarily used to store additional information in an image.
 This is easily implemented by filling those chunks with random bytes, adhering to the size and structural constraints as specifeid~\cite{libpng_chunks}.
 \section{Fuzz Testing}
-\subsection{Fuzz Driver}
+\subsection{Fuzz Driver \normalfont\textit{(Sebastian Schatz, Paul Kalz, Marwin Linke)}}
 As for the fuzz driver, we decided to use code samples, provided directly by \textit{PNGJ} itself~\cite{PNGJ_samples}, and combine them to test multiple functionalities.
 The largest contribution to the covered branches came by simply reading the PNG data, this covers all chunks, albeit superficially.
 To test for detailed aspects of the library we also included a pipeline that changes the PNG image depending on its color type and rereads the data in every step.
@@ -322,7 +321,7 @@ Lastly, all converted images and images that were generated with grayscale by de
 Although this approach tests multiple functionalities, it is still far from covering all functionalities.
 It would need a very detailed fuzz driver to cover everything, which would pose its own challenge and lie outside the scope of this project.
 
-\subsection{Guidance}
+\subsection{Guidance \normalfont\textit{(Sebastian Schatz, Paul Kalz, Marwin Linke)}}
 JQF also offers the possibility to alter its guidance properties, this is a useful aspect of fuzzing. However, we decided to not use it and stick to the default guidance settings.
 
 PNG is a very interesting data format when it comes to fuzzing. The general idea of fuzzing is to generate random data that tries to cover most of the functionality of a program.
@@ -335,24 +334,25 @@ The explicit nature of PNGs may offer approaches like grammar fuzzing to be succ
 
 % TODO: Beschreibt die durchgeführten Experimente und deren Ergebnisse. Wie hoch war die erreichte Coverage? Konnten Bugs/Crashes gefunden werden? Wenn ja, welche?
 
-\subsection{Experiments}
+\subsection{Experiments \normalfont\textit{(Paul Kalz, Marwin Linke)}}
 To evaluate the efficiency of our implementation, we fuzzed the \textit{PNGJ}-libary with the following four fuzzers using our fuzz driver:
 \begin{itemize}
     \item A \textbf{Complete Fuzzer}, which uses the full capability of our generator to correctly generate all critical and optional chunks as specified~\cite{libpng_chunks}.
     \item A \textbf{Random Fuzzer} as a baseline, which generates random chunks in which only the chunk types and the CRC checksums of the chunks are calculated correctly.
-    \item A \textbf{Probable Fuzzer} a version of our random baseline that additionally generates a correct IHDR and a partially correct IDAT chunk. The structure of the PNG files is therefore correct at least in the cirtical chunks.
-    \item A \textbf{Simple Fuzzer} a simplified version of our Complete Fuzzer, which contains only IHDR, IDAT, PLTE and IEND chunks, all colour types, only bit-depth of 8, default compression, no interlacing and no filtering. This fuzzer therefore generates only correct PNG files.
+    \item A \textbf{Probable Fuzzer}, a version of our random baseline that additionally generates a correct \texttt{IHDR} and a partially correct \texttt{IDAT} chunk. The structure of the PNG files is therefore probable to be generated with correct, critical chunks.
+    \item A \textbf{Simple Fuzzer} as a simplified version of our Complete Fuzzer, which only generates \texttt{IHDR}, \texttt{IDAT}, \texttt{PLTE} and \texttt{IEND} chunks. It can generate all color types, but only with a bit-depth of 8. 
+    It uses the default compression as well as the default filtering method and doesn't feature interlacing. This fuzzer resembles a very basic PNG writer that offers only the most basic and important features, all generated images are valid.
 
 \end{itemize}
 Every fuzzer except the Simple Fuzzer is also able to generate optional chunks, albeit by chance.
 
 We tested PNGJ with each fuzzer 10 times, with each repetition taking one hour. All experiments were executed on a Windows 10 system using a GTX 1060 6 GB GPU, a Intel i5 7600k CPU with 16 GB DDR4-3200 RAM. The experiments were run sequentially.
 
-\subsection{Results}
-We did not find any bugs or crashes during our tests, so we were only able to analyse the coverage of the fuzzers.
+\subsection{Results \normalfont\textit{(Paul Kalz, Marwin Linke)}}
+We did not find any unique failures during our tests (except for an odd behaviour explained in the result discussion section~\ref{crashes}), so we were only able to analyse the coverage of the fuzzers.
 
 In the following diagrams, the blue graph always belongs to the Complete Fuzzer, the red graph to the Probable Fuzzer, the green graph to the Simple Fuzzer, and the black graph to the Random Fuzzer.
-\subsubsection{Total Coverage}
+\subsubsection{Total Coverage \normalfont\textit{(Paul Kalz, Marwin Linke)}}
 \begin{center}
 \includegraphics[width=\textwidth]{img/complete_coverage}
 \captionof{figure}{Coverage for each repetition over time}\label{fig1}
@@ -362,9 +362,9 @@ In the following diagrams, the blue graph always belongs to the Complete Fuzzer,
 \captionof{figure}{Final Coverage}\label{fig2}
 \end{center}
 
-With our Complete Fuzzer, we managed to cover 1629 branches in every repetition. The Probable Fuzzer covered an average of 1112.9 branches. The Simple Fuzzer covered 994 Branches in every repitition. And the Random Fuzzer covered an average of 732,2 branches.
+With our Complete Fuzzer, we managed to cover 1629 branches in every run. The Probable Fuzzer covered an average of 1112.9 branches. The Simple Fuzzer covered 994 Branches in every run. And the Random Fuzzer covered an average of 732.2 branches, as seen in Table~\ref{tab3}.
 
-The number of covered branches for the Complete Fuzzer and the Simple Fuzzer did not change during the runs. This is why Figure 2 does not show any variance in the final coverage. The coverage of the Probable Fuzzer fluctuated slightly between 1110 and 1115 branches during the test runs. The coverage of the Random Fuzzer varied significantly more from 610 to 783 branches.
+The number of covered branches for the Complete Fuzzer and the Simple Fuzzer did not change during the runs. This is why Figure~\ref{fig2} does not show any variance in the final coverage. The coverage of the Probable Fuzzer fluctuated slightly between 1110 and 1115 branches during the test runs. The coverage of the Random Fuzzer varied significantly more from 610 to 783 branches.
 It can also be observed that the fuzzers find a lot of new branches in the first minute and that the coverage almost stops to increase after that.
 
 \bgroup
@@ -387,7 +387,7 @@ It can also be observed that the fuzzers find a lot of new branches in the first
 \end{table}
 \egroup
 
-\subsubsection{Valid Coverage}
+\subsubsection{Valid Coverage \normalfont\textit{(Paul Kalz, Marwin Linke)}}
 \begin{center}
 \includegraphics[width=\textwidth]{img/valid_coverage}
 \captionof{figure}{Valid Coverage over time}\label{fig3}
@@ -403,19 +403,27 @@ We checked the statistical significance of the differences in coverage using Man
 
 \section{Result Discussion}
 %TODO: Versucht die Ergebnisse der Experimente zu interpretieren und zu erklären (discussion). Zieht Sie Folgerungen aus den Ergebnissen (conclusion). Beschreibt die nächsten Schritte, die durchgeführt werden müssten/könnten/sollten (future work).
-\subsection{Discussion}
-As expected, the Complete Fuzzer provides the greatest coverage. As it contains many optional chunks and features, it can utilise many of PNGJ's functions. This becomes particularly clear when it is compared with the Simple Fuzzer, which covers a much smaller number of branches due to its limited options. The Probable Fuzzer has decent coverage for its relatively low implementation effort. However, due to the complexity of a PNG file, it is very unlikely to randomly generate one of the options that would enable even higher coverage. The same applies to the Random Fuzzer.
+\subsection{Discussion \normalfont\textit{(Paul Kalz)}}
+\subsubsection{Coverage Analysis}
+As expected, the Complete Fuzzer provides the greatest coverage. As it contains many optional chunks and features, it can utilise many of PNGJs functions. This becomes particularly clear when it is compared with the Simple Fuzzer, which covers a much smaller number of branches due to its limited options. The Probable Fuzzer has decent coverage for its relatively low implementation effort. However, due to the complexity of a PNG file, it is very unlikely to randomly generate one of the options that would enable even higher coverage. The same applies to the Random Fuzzer.
 
 The fact that the fuzzers reach their maximum coverage after about a minute may be explained by the limited complexity of the PNGJ library as well as our test driver. The final coverage of the Probable and Random Fuzzers varies between runs, as sometimes options are found randomly that lead to more coverage and sometimes not. With the Complete and Simple Fuzzer, on the other hand, the structure is more strictly predefined, so it is more likely to generate all possible options, which seems to have happened during our runs.
 
-When testing the Random Fuzzer, a Heap Error sometimes occurred which caused our fuzzing run to crash. We have not yet been able to find the cause of this error.
-
 The valid coverage of the Complete Fuzzer and the Simple Fuzzer is identical to their total coverage, because these two Fuzzers only generate valid PNG-files. The valid coverage of the Probable Fuzzer is on average slightly below its total coverage, which should be due to the fact that this fuzzer can generate all critical chunks correctly. The random fuzzer has no valid coverage, as it is very unlikely to generate a correct PNG file at random.
 
-\subsection{Conclusion}
+\subsubsection{Crashes}
+\label{crashes}
+When testing the Random Fuzzer, a heap error appears that is found as a unique failure by JQF. Furthermore, the same error sometimes causes the fuzz run to crash completely, making it stop after only a few seconds.
+The error, which cannot be caught as an exception, was logged as follows:
+\begin{center}
+    \texttt{java.lang.OutOfMemoryError - Java heap space}    
+\end{center}
+We have not yet been able to find the cause of this error and are unsure, whether our Random Fuzzer, JQF as a fuzzing framework or PNGJ as the library is responsible for it.
+
+\subsection{Conclusion \normalfont\textit{(Paul Kalz)}}
 Our generator creates valid PNG files that can contain all critical and optional chunks. This gives us significantly higher total and valid coverage on our fuzzing targets than simpler fuzzers. PNG is a relatively complex file format in which there are many dependencies between individual components. Therefore, a PNG generator needs a fairly fixed structure to generate valid files. Generating PNGs is thus not efficient with simple fuzzers that are largely based on chance.
 
-\subsection{Future Work}
+\subsection{Future Work \normalfont\textit{(Paul Kalz)}}
 Our generator could be tested on other more complex fuzzing targets. In addition, the JQF guidance could be adapted to possibly deliver better results with our generator.
 
 %
@@ -475,5 +483,11 @@ Libpng: Filtering,
 Libpng: Data representation,
 
 \url{http://www.libpng.org/pub/png/spec/1.2/PNG-DataRep.html}
+\bibitem{github}
+JQF-fork with implemented generator, driver and tests,
+\textit{(it also contains temporary files, which are not cleaned up)},
+
+\url{https://github.com/Marwin-Linke/Semesterprojekt}
+
 \end{thebibliography}
 \end{document}

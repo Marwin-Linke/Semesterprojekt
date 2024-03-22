@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1710853642 "c:/Users/lohen/IdeaProjects/Semesterprojekt/report/report.tex" "report.pdf" "report" 1710853644 0
+["pdflatex"] 1711130098 "c:/Users/lohen/IdeaProjects/Semesterprojekt/report/report.tex" "report.pdf" "report" 1711130100 0
   "C:/Program Files/MiKTeX/fonts/tfm/jknappen/ec/tcrm0900.tfm" 993058908 1444 b1efc6b76338296f8076c1701e4660f3 ""
   "C:/Program Files/MiKTeX/fonts/tfm/public/cm/cmbx10.tfm" 1136765053 1328 c834bbb027764024c09d3d2bf908b5f0 ""
   "C:/Program Files/MiKTeX/fonts/tfm/public/cm/cmbx12.tfm" 1136765053 1324 c910af8c371558dc20f2d7822f66fe64 ""
@@ -58,13 +58,13 @@
   "C:/Users/lohen/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map" 1688315996 80909 eab91d9745dd2edfd62a31d53cd5fe15 ""
   "C:/Users/lohen/AppData/Local/MiKTeX/fonts/pk/ljfour/jknappen/ec/dpi600/tcrm0900.pk" 1688316603 10472 59b5add4a1c5c3273a9230c3be729742 ""
   "C:/Users/lohen/AppData/Local/MiKTeX/miktex/data/le/pdftex/pdflatex.fmt" 1688316030 23208740 f1c1fc3b918ca57d9c82cd249511469e ""
-  "c:/Users/lohen/IdeaProjects/Semesterprojekt/report/report.tex" 1710853642 35266 a2ea0da3231f3f0b773e526ab0387f4e ""
+  "c:/Users/lohen/IdeaProjects/Semesterprojekt/report/report.tex" 1711130098 37242 7d9281e0ecbc3ed0a45e755d9daf118a ""
   "img/average_coverage.png" 1710847571 126073 4e2715fefbebd5c19532d97230ce75d6 ""
   "img/boxplot_coverage.png" 1710847571 70586 a869aaaf3a44bca9bcbf283c9c41398d ""
   "img/complete_coverage.png" 1710847572 153065 12a2a4bfaf79b4cc9fe8946c5b8f8325 ""
   "img/valid_coverage.png" 1710847572 148635 d0da7beeaff8de06d85c9b88f795b31a ""
-  "report.aux" 1710853644 7923 364e19fc8793f6ca3c6cdeec8f2c98e2 "pdflatex"
-  "report.tex" 1710853642 35266 a2ea0da3231f3f0b773e526ab0387f4e ""
+  "report.aux" 1711130100 9223 62497cf2f6d332804ab582ec6a3e5544 "pdflatex"
+  "report.tex" 1711130098 37242 7d9281e0ecbc3ed0a45e755d9daf118a ""
   (generated)
   "report.aux"
   "report.log"
